@@ -130,15 +130,18 @@ class AdminController extends Controller
     public function updateSettings(Request $request)
     {
         $validator = $request->validate([
-            'default_profit_margin' => 'required|numeric|min:0|max:100',
-            'company_name' => 'required|string|max:255',
-            'company_address' => 'required|string',
-            'company_phone' => 'required|string|max:20',
-            'beneficiary_name' => 'nullable|string|max:255',
-            'beneficiary_bank' => 'nullable|string|max:255',
-            'account_number' => 'nullable|string|max:50',
-            'swift_code' => 'nullable|string|max:20',
-            'bank_address' => 'nullable|string',
+            'default_profit_margin' => 'required|numeric|min:0|max:500',
+            'company_name'          => 'required|string|max:255',
+            'company_address'       => 'required|string',
+            'company_phone'         => 'required|string|max:50',
+            'company_email'         => 'nullable|email|max:255',
+            'company_attn'          => 'nullable|string|max:255',
+            'beneficiary_name'      => 'nullable|string|max:255',
+            'beneficiary_bank'      => 'nullable|string|max:255',
+            'account_number'        => 'nullable|string|max:100',
+            'swift_code'            => 'nullable|string|max:30',
+            'bank_address'          => 'nullable|string',
+            'beneficiary_address'   => 'nullable|string',
         ]);
 
         foreach ($validator as $key => $value) {

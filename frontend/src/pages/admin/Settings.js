@@ -1,182 +1,175 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Row, Col, message, Spin, InputNumber } from 'antd';
-import { SaveOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import { Form, Input, InputNumber, Button, Card, Row, Col, message, Divider, Typography, Spin } from 'antd';
+import { SaveOutlined, SettingOutlined, BankOutlined, PercentageOutlined } from '@ant-design/icons';
 import AppLayout from '../../components/AppLayout';
+import axios from 'axios';
 
-const Settings = () => {
+const { Title, Text } = Typography;
+const { TextArea } = Input;
+
+export default function AdminSettings() {
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const [settings, setSettings] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchSettings();
+    axios.get('/api/admin/settings')
+      .then(res => {
+        form.setFieldsValue({
+          company_name: res.data.company_name || 'DAYANCO TRADING CO., LIMITED',
+          company_address: res.data.company_address || 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU 511455, P.R. CHINA',
+          company_phone: res.data.company_phone || '+86 188188 45411',
+          company_email: res.data.company_email || 'team@dayancofficial.com',
+          company_attn: res.data.company_attn || 'Mr. Abdulmalek',
+          default_profit_margin: parseFloat(res.data.default_profit_margin || 20),
+          beneficiary_name: res.data.beneficiary_name || 'DAYANCO TRADING CO., LIMITED',
+          beneficiary_bank: res.data.beneficiary_bank || 'ZHEJIANG CHOUZHOU COMMERCIAL BANK',
+          account_number: res.data.account_number || 'NRA1564714201050006871',
+          swift_code: res.data.swift_code || 'CZCBCNLX',
+          bank_address: res.data.bank_address || 'YIWULEYUAN EAST, JIANGBEI RD, YIWU, ZHEJIANG CHINA',
+          beneficiary_address: res.data.beneficiary_address || '9F, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA',
+        });
+      })
+      .catch(() => message.error('Failed to load settings'))
+      .finally(() => setLoading(false));
   }, []);
 
-  const fetchSettings = async () => {
+  const onFinish = async (values) => {
+    setSaving(true);
     try {
-      setLoading(true);
-      const response = await axios.get('/api/admin/settings');
-      setSettings(response.data);
-      form.setFieldsValue(response.data);
-    } catch (error) {
-      message.error('Failed to fetch settings');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (values) => {
-    try {
-      setLoading(true);
       await axios.put('/api/admin/settings', values);
-      message.success('Settings updated successfully');
-      fetchSettings();
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Failed to update settings');
+      message.success('Settings saved successfully!');
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to save settings');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (loading && Object.keys(settings).length === 0) {
-    return <Spin size="large" style={{ display: 'block', margin: '50px auto' }} />;
-  }
+  if (loading) return <AppLayout><Spin size="large" style={{ display: 'block', margin: '80px auto' }} /></AppLayout>;
 
   return (
     <AppLayout>
-    <div style={{ padding: '0' }}>
-      <Card title="System Settings">
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-        >
-          {/* Company Settings */}
-          <Card size="small" title="Company Information" style={{ marginBottom: '16px' }}>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="company_name"
-                  label="Company Name"
-                  rules={[{ required: true, message: 'Please enter company name' }]}
-                >
-                  <Input placeholder="Enter company name" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="company_phone"
-                  label="Company Phone"
-                  rules={[{ required: true, message: 'Please enter company phone' }]}
-                >
-                  <Input placeholder="Enter company phone" />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={16}>
-              <Col span={24}>
-                <Form.Item
-                  name="company_address"
-                  label="Company Address"
-                  rules={[{ required: true, message: 'Please enter company address' }]}
-                >
-                  <Input.TextArea rows={2} placeholder="Enter company address" />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Card>
+      <div style={{ padding: '24px', maxWidth: 860, margin: '0 auto' }}>
+        <Title level={3}><SettingOutlined /> System Settings</Title>
 
-          {/* Financial Settings */}
-          <Card size="small" title="Financial Settings" style={{ marginBottom: '16px' }}>
+        <Form form={form} layout="vertical" onFinish={onFinish}>
+
+          {/* Profit Margin */}
+          <Card
+            title={<><PercentageOutlined /> Default Profit Margin</>}
+            style={{ marginBottom: 20, borderLeft: '4px solid #667eea' }}
+          >
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
                   name="default_profit_margin"
                   label="Default Profit Margin (%)"
-                  rules={[{ required: true, message: 'Please enter default profit margin' }]}
+                  help="This is applied automatically when factory submits pricing. Admin can override per order."
+                  rules={[{ required: true }]}
                 >
                   <InputNumber
-                    min={0}
-                    max={100}
-                    step={0.1}
-                    precision={1}
+                    min={0} max={500} step={0.5}
                     style={{ width: '100%' }}
-                    placeholder="Enter default profit margin"
+                    formatter={v => `${v}%`}
+                    parser={v => v.replace('%', '')}
+                    size="large"
                   />
+                </Form.Item>
+              </Col>
+              <Col span={12} style={{ paddingTop: 40 }}>
+                <Text type="secondary">
+                  Example: Factory cost = $10, Margin = 30% → Sale price = $13
+                </Text>
+              </Col>
+            </Row>
+          </Card>
+
+          {/* Company Info */}
+          <Card
+            title={<><SettingOutlined /> Company Information (appears on documents)</>}
+            style={{ marginBottom: 20 }}
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="company_name" label="Company Name" rules={[{ required: true }]}>
+                  <Input placeholder="DAYANCO TRADING CO., LIMITED" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="company_attn" label="Contact Person (ATTN)" rules={[{ required: true }]}>
+                  <Input placeholder="Mr. Abdulmalek" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="company_phone" label="Phone" rules={[{ required: true }]}>
+                  <Input placeholder="+86 188188 45411" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="company_email" label="Email" rules={[{ required: true }]}>
+                  <Input placeholder="team@dayancofficial.com" />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="company_address" label="Company Address" rules={[{ required: true }]}>
+                  <TextArea rows={2} placeholder="Full company address" />
                 </Form.Item>
               </Col>
             </Row>
           </Card>
 
           {/* Bank Details */}
-          <Card size="small" title="Bank Details for Invoices" style={{ marginBottom: '16px' }}>
+          <Card
+            title={<><BankOutlined /> Bank / Payment Details (appears on invoices)</>}
+            style={{ marginBottom: 20 }}
+          >
             <Row gutter={16}>
               <Col span={12}>
-                <Form.Item
-                  name="beneficiary_name"
-                  label="Beneficiary Name"
-                >
-                  <Input placeholder="Enter beneficiary name" />
+                <Form.Item name="beneficiary_name" label="Beneficiary Name" rules={[{ required: true }]}>
+                  <Input placeholder="DAYANCO TRADING CO., LIMITED" />
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <Form.Item
-                  name="beneficiary_bank"
-                  label="Beneficiary Bank"
-                >
-                  <Input placeholder="Enter beneficiary bank" />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="account_number"
-                  label="Account Number"
-                >
-                  <Input placeholder="Enter account number" />
+                <Form.Item name="beneficiary_bank" label="Beneficiary Bank" rules={[{ required: true }]}>
+                  <Input placeholder="ZHEJIANG CHOUZHOU COMMERCIAL BANK" />
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <Form.Item
-                  name="swift_code"
-                  label="SWIFT Code"
-                >
-                  <Input placeholder="Enter SWIFT code" />
+                <Form.Item name="account_number" label="Account Number" rules={[{ required: true }]}>
+                  <Input placeholder="NRA1564714201050006871" />
                 </Form.Item>
               </Col>
-            </Row>
-            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="swift_code" label="SWIFT Code" rules={[{ required: true }]}>
+                  <Input placeholder="CZCBCNLX" />
+                </Form.Item>
+              </Col>
               <Col span={24}>
-                <Form.Item
-                  name="bank_address"
-                  label="Bank Address"
-                >
-                  <Input.TextArea rows={2} placeholder="Enter bank address" />
+                <Form.Item name="beneficiary_address" label="Beneficiary Address">
+                  <TextArea rows={2} placeholder="Beneficiary full address" />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="bank_address" label="Bank Address">
+                  <TextArea rows={2} placeholder="Bank full address" />
                 </Form.Item>
               </Col>
             </Row>
           </Card>
 
-          {/* Form Actions */}
-          <Row justify="end">
-            <Col>
-              <Button 
-                type="primary" 
-                htmlType="submit" 
-                loading={loading}
-                icon={<SaveOutlined />}
-              >
-                Save Settings
-              </Button>
-            </Col>
-          </Row>
+          <Button
+            type="primary" htmlType="submit"
+            icon={<SaveOutlined />}
+            loading={saving}
+            size="large"
+            block
+            style={{ background: '#667eea', borderColor: '#667eea' }}
+          >
+            Save All Settings
+          </Button>
         </Form>
-      </Card>
-    </div>
+      </div>
     </AppLayout>
   );
-};
-
-export default Settings;
+}
