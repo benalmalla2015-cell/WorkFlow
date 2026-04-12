@@ -187,7 +187,7 @@ class Order extends Model
 
     public function isPaymentConfirmed()
     {
-        return $this->status === 'payment_confirmed';
+        return in_array($this->status, ['payment_confirmed', 'completed'], true);
     }
 
     public function isCompleted()
@@ -202,7 +202,7 @@ class Order extends Model
         }
 
         if ($user->isSales() && $this->sales_user_id === $user->id) {
-            return in_array($this->status, ['draft', 'factory_pricing']);
+            return $this->status === 'draft';
         }
 
         if ($user->isFactory()) {

@@ -6,6 +6,9 @@ use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 class DatabaseSeeder extends Seeder
 {
@@ -14,34 +17,77 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create default admin user
-        User::create([
-            'name' => 'System Administrator',
-            'email' => 'admin@workflow.com',
-            'password' => Hash::make('admin123'),
-            'role' => 'admin',
-            'is_active' => true,
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        $permissions = [
+            'orders.create',
+            'orders.submit_to_factory',
+            'orders.factory_pricing',
+            'orders.approve',
+            'orders.customer_approval',
+            'orders.confirm_payment',
+            'documents.generate_quotation',
+            'documents.generate_invoice',
+            'users.manage',
+            'settings.manage',
+            'audit.view',
+            'analytics.view',
+        ];
+
+        foreach ($permissions as $permission) {
+            Permission::findOrCreate($permission, 'web');
+        }
+
+        $adminRole = Role::findOrCreate('admin', 'web');
+        $salesRole = Role::findOrCreate('sales', 'web');
+        $factoryRole = Role::findOrCreate('factory', 'web');
+
+        $adminRole->syncPermissions($permissions);
+        $salesRole->syncPermissions([
+            'orders.create',
+            'orders.submit_to_factory',
+            'orders.customer_approval',
+            'orders.confirm_payment',
+            'documents.generate_quotation',
+            'documents.generate_invoice',
+        ]);
+        $factoryRole->syncPermissions([
+            'orders.factory_pricing',
         ]);
 
-        // Create sample sales user
-        User::create([
-            'name' => 'Sales Representative',
-            'email' => 'sales@workflow.com',
-            'password' => Hash::make('sales123'),
-            'role' => 'sales',
-            'is_active' => true,
-        ]);
+        $admin = User::updateOrCreate(
+            ['email' => 'admin@workflow.com'],
+            [
+                'name' => 'System Administrator',
+                'password' => Hash::make('admin123'),
+                'role' => 'admin',
+                'is_active' => true,
+            ]
+        );
+        $admin->syncRoles(['admin']);
 
-        // Create sample factory user
-        User::create([
-            'name' => 'Factory Manager',
-            'email' => 'factory@workflow.com',
-            'password' => Hash::make('factory123'),
-            'role' => 'factory',
-            'is_active' => true,
-        ]);
+        $sales = User::updateOrCreate(
+            ['email' => 'sales@workflow.com'],
+            [
+                'name' => 'Sales Representative',
+                'password' => Hash::make('sales123'),
+                'role' => 'sales',
+                'is_active' => true,
+            ]
+        );
+        $sales->syncRoles(['sales']);
 
-        // Ensure default settings exist
+        $factory = User::updateOrCreate(
+            ['email' => 'factory@workflow.com'],
+            [
+                'name' => 'Factory Manager',
+                'password' => Hash::make('factory123'),
+                'role' => 'factory',
+                'is_active' => true,
+            ]
+        );
+        $factory->syncRoles(['factory']);
+
         $defaultSettings = [
             'default_profit_margin' => '20',
             'company_name' => 'DAYANCO',

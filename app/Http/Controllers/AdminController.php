@@ -41,7 +41,7 @@ class AdminController extends Controller
 
     public function createUser(Request $request)
     {
-        $validator = $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users',
             'password' => 'required|min:8',
@@ -51,13 +51,15 @@ class AdminController extends Controller
         ]);
 
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'phone' => $request->phone,
-            'role' => $request->role,
-            'is_active' => $request->is_active ?? true,
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'phone' => $validated['phone'] ?? null,
+            'role' => $validated['role'],
+            'is_active' => $validated['is_active'] ?? true,
         ]);
+
+        $user->syncRoles([$validated['role']]);
 
         AuditLog::log('user_created', $user);
 
@@ -69,7 +71,7 @@ class AdminController extends Controller
 
     public function updateUser(Request $request, User $user)
     {
-        $validator = $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
             'phone' => 'nullable|string|max:20',
@@ -79,7 +81,8 @@ class AdminController extends Controller
 
         $oldValues = $user->toArray();
         
-        $user->update($validator);
+        $user->update($validated);
+        $user->syncRoles([$validated['role']]);
 
         AuditLog::log('user_updated', $user, $oldValues, $user->toArray());
 

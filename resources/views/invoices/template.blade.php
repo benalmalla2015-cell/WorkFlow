@@ -114,10 +114,10 @@ table.bank .bank-label { background:#d5e8d4; font-weight:bold; width:38%; }
         <td>{{ now()->format('M j\s\t') }}</td>
         <td>{{ $item['name'] }}</td>
         <td>
-          100% for {{ $item['quantity'] }}pcs / EXW SAUDI<br>
-          – Refer to the quotation number of {{ $invoice_number }}<br>
-          – Total styles: 1 dozens | {{ $item['quantity'] }} pcs<br>
-          – Production Lead Time: around {{ now()->addDays(30)->format('F Y') }}
+          100% for {{ $item['quantity'] }} pcs<br>
+          – Refer to quotation number {{ $order->order_number }}<br>
+          – Specifications: {{ $item['description'] ?: 'As approved quotation' }}<br>
+          – Production Lead Time: around {{ $item['production_days'] }} days
         </td>
         <td class="amount">{{ number_format($item['total'], 2) }}</td>
       </tr>

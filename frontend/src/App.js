@@ -28,15 +28,15 @@ function App() {
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-                <Route path="/sales/orders" element={<PrivateRoute><SalesOrders /></PrivateRoute>} />
-                <Route path="/sales/orders/new" element={<PrivateRoute><SalesOrderForm /></PrivateRoute>} />
-                <Route path="/sales/orders/:id/edit" element={<PrivateRoute><SalesOrderForm /></PrivateRoute>} />
-                <Route path="/factory/orders" element={<PrivateRoute><FactoryOrders /></PrivateRoute>} />
-                <Route path="/factory/orders/:id/edit" element={<PrivateRoute><FactoryOrderForm /></PrivateRoute>} />
-                <Route path="/admin/dashboard" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
-                <Route path="/admin/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
-                <Route path="/admin/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
-                <Route path="/admin/audit-logs" element={<PrivateRoute><AuditLogs /></PrivateRoute>} />
+                <Route path="/sales/orders" element={<PrivateRoute allowedRoles={['sales', 'admin']}><SalesOrders /></PrivateRoute>} />
+                <Route path="/sales/orders/new" element={<PrivateRoute allowedRoles={['sales', 'admin']}><SalesOrderForm /></PrivateRoute>} />
+                <Route path="/sales/orders/:id/edit" element={<PrivateRoute allowedRoles={['sales', 'admin']}><SalesOrderForm /></PrivateRoute>} />
+                <Route path="/factory/orders" element={<PrivateRoute allowedRoles={['factory', 'admin']}><FactoryOrders /></PrivateRoute>} />
+                <Route path="/factory/orders/:id/edit" element={<PrivateRoute allowedRoles={['factory', 'admin']}><FactoryOrderForm /></PrivateRoute>} />
+                <Route path="/admin/dashboard" element={<PrivateRoute allowedRoles={['admin']}><AdminDashboard /></PrivateRoute>} />
+                <Route path="/admin/users" element={<PrivateRoute allowedRoles={['admin']}><UserManagement /></PrivateRoute>} />
+                <Route path="/admin/settings" element={<PrivateRoute allowedRoles={['admin']}><Settings /></PrivateRoute>} />
+                <Route path="/admin/audit-logs" element={<PrivateRoute allowedRoles={['admin']}><AuditLogs /></PrivateRoute>} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </div>

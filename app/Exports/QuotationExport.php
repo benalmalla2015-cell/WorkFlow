@@ -12,6 +12,8 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Color;
+use PhpOffice\PhpSpreadsheet\Worksheet\MemoryDrawing;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class QuotationExport implements FromArray, WithEvents, WithTitle
 {
@@ -46,6 +48,11 @@ class QuotationExport implements FromArray, WithEvents, WithTitle
                 $custName  = optional($o->customer)->full_name ?? '?';
                 $orderNum  = $o->order_number;
                 $productName = $o->product_name;
+                $companyName = Setting::get('company_name', 'DAYANCO TRADING CO., LIMITED');
+                $companyAddress = Setting::get('company_address', 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA');
+                $companyPhone = Setting::get('company_phone', '+86 188188 45411');
+                $companyEmail = Setting::get('company_email', 'team@dayancofficial.com');
+                $companyAttn = Setting::get('company_attn', 'Mr. Abdulmalek');
 
                 $green  = 'D5E8D4';
                 $blue   = 'DAE8FC';
@@ -67,7 +74,7 @@ class QuotationExport implements FromArray, WithEvents, WithTitle
                 }
 
                 // ── R1: DAYANCO® brand (right side) ───────────────────
-                $ws->setCellValue('N1', 'DAYANCO®');
+                $ws->setCellValue('N1', $companyName);
                 $ws->getStyle('N1:P1')->applyFromArray([
                     'font' => ['bold'=>true,'size'=>18,'color'=>['rgb'=>'1A5276']],
                     'alignment' => ['horizontal'=>Alignment::HORIZONTAL_RIGHT],
@@ -83,7 +90,7 @@ class QuotationExport implements FromArray, WithEvents, WithTitle
                 $ws->mergeCells('N2:P2');
 
                 // ── R3: Company Address ────────────────────────────────
-                $ws->setCellValue('A3', 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA');
+                $ws->setCellValue('A3', $companyAddress);
                 $ws->mergeCells('A3:P3');
                 $ws->getStyle('A3')->applyFromArray([
                     'font' => ['size'=>7,'color'=>['rgb'=>'333333']],
@@ -91,7 +98,7 @@ class QuotationExport implements FromArray, WithEvents, WithTitle
                 ]);
 
                 // ── R4: ATTN ──────────────────────────────────────────
-                $ws->setCellValue('A4', 'ATTN: Mr. Abdulmalek  China Mobile: +86 188188 45411  E-mail: team@dayancofficial.com');
+                $ws->setCellValue('A4', 'ATTN: ' . $companyAttn . '  China Mobile: ' . $companyPhone . '  E-mail: ' . $companyEmail);
                 $ws->mergeCells('A4:P4');
                 $ws->getStyle('A4')->applyFromArray([
                     'font' => ['size'=>7,'color'=>['rgb'=>'333333']],
@@ -229,6 +236,25 @@ class QuotationExport implements FromArray, WithEvents, WithTitle
                 $ws->setCellValue('A14', 'Generated: ' . now()->format('Y-m-d H:i') . '  |  Order: ' . $orderNum);
                 $ws->getStyle('A14')->applyFromArray(['font'=>['size'=>8,'color'=>['rgb'=>'555555']]]);
                 $ws->mergeCells('A14:P14');
+
+                $qrPng = QrCode::format('png')
+                    ->size(100)
+                    ->margin(1)
+                    ->generate(url('/api/orders/verify/' . $orderNum));
+
+                $qrImage = @imagecreatefromstring($qrPng);
+
+                if ($qrImage !== false) {
+                    $drawing = new MemoryDrawing();
+                    $drawing->setName('Verification QR');
+                    $drawing->setDescription('Verification QR');
+                    $drawing->setImageResource($qrImage);
+                    $drawing->setRenderingFunction(MemoryDrawing::RENDERING_PNG);
+                    $drawing->setMimeType(MemoryDrawing::MIMETYPE_PNG);
+                    $drawing->setHeight(60);
+                    $drawing->setCoordinates('N13');
+                    $drawing->setWorksheet($ws);
+                }
 
                 // ── Global border for header rows 8-11 ────────────────
                 $ws->getStyle('A8:P11')->applyFromArray([

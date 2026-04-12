@@ -81,13 +81,16 @@ Route::middleware('auth:sanctum')->post('/upload', function (Request $request) {
     ]);
 
     if ($request->hasFile('file')) {
-        $folder = $request->type === 'sales_upload' ? 'sales_uploads' : 'factory_uploads';
-        $path = $request->file('file')->store($folder, 'public');
+        $disk = config('workflow.uploads_disk', 'public');
+        $folder = $request->type === 'sales_upload'
+            ? config('workflow.sales_upload_root', 'sales_uploads')
+            : config('workflow.factory_upload_root', 'factory_uploads');
+        $path = $request->file('file')->store($folder, $disk);
 
         return response()->json([
             'message' => 'File uploaded successfully',
             'path' => $path,
-            'url'  => '/api/attachments/' . basename($path) . '/download',
+            'disk' => $disk,
         ]);
     }
 

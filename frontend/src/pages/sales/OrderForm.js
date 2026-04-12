@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Input, InputNumber, Button, Upload, Card, Row, Col, message, Space, Typography, Divider, Spin, Tag } from 'antd';
-import { UploadOutlined, SaveOutlined, ArrowLeftOutlined, FilePdfOutlined, FileExcelOutlined, CheckCircleOutlined, DollarOutlined } from '@ant-design/icons';
+import { UploadOutlined, SaveOutlined, ArrowLeftOutlined, FilePdfOutlined, FileExcelOutlined, CheckCircleOutlined, DollarOutlined, SendOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import axios from 'axios';
@@ -88,14 +88,18 @@ export default function SalesOrderForm() {
     setDocLoading(p => ({ ...p, [action]: true }));
     try {
       let res;
-      if (action === 'customer_approval') {
+      if (action === 'send_to_factory') {
+        res = await axios.patch(`/api/orders/${id}/status`, { status: 'factory_pricing' });
+        message.success('Order submitted to factory pricing');
+        setOrder(p => ({ ...p, status: 'factory_pricing' }));
+      } else if (action === 'customer_approval') {
         res = await axios.post(`/api/orders/${id}/customer-approval`);
         message.success('Customer approval recorded');
         setOrder(p => ({ ...p, status: 'customer_approved', customer_approval: true }));
       } else if (action === 'confirm_payment') {
         res = await axios.post(`/api/orders/${id}/confirm-payment`);
         message.success('Payment confirmed');
-        setOrder(p => ({ ...p, status: 'payment_confirmed', payment_confirmed: true }));
+        setOrder(p => ({ ...p, status: 'completed', payment_confirmed: true }));
       } else if (action === 'generate_quotation') {
         res = await axios.post(`/api/orders/${id}/quotation`);
         message.success('Quotation generated!');
@@ -126,7 +130,7 @@ export default function SalesOrderForm() {
 
   if (loading) return <AppLayout><Spin size="large" style={{ display: 'block', margin: '80px auto' }} /></AppLayout>;
 
-  const canEdit = !order || ['draft', 'factory_pricing'].includes(order?.status);
+  const canEdit = !order || order?.status === 'draft';
   const isApproved = ['approved', 'customer_approved', 'payment_confirmed', 'completed'].includes(order?.status);
   const isCustomerApproved = ['customer_approved', 'payment_confirmed', 'completed'].includes(order?.status);
 
@@ -218,9 +222,22 @@ export default function SalesOrderForm() {
           </Card>
 
           {canEdit && (
-            <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving} size="large" block>
-              {isEdit ? 'Update Order' : 'Create Order'}
-            </Button>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving} size="large" block>
+                {isEdit ? 'Update Order' : 'Create Order'}
+              </Button>
+              {isEdit && order?.status === 'draft' && (
+                <Button
+                  icon={<SendOutlined />}
+                  loading={docLoading.send_to_factory}
+                  size="large"
+                  block
+                  onClick={() => handleAction('send_to_factory', 'Submit to Factory')}
+                >
+                  Submit to Factory Pricing
+                </Button>
+              )}
+            </Space>
           )}
         </Form>
 
@@ -239,7 +256,7 @@ export default function SalesOrderForm() {
                     ⬇ Download Quotation
                   </Button>
                 )}
-                {isCustomerApproved && (
+                {(order?.payment_confirmed || order?.status === 'completed') && (
                   <Button
                     type="primary" danger icon={<FilePdfOutlined />}
                     loading={docLoading.generate_invoice}
@@ -272,8 +289,8 @@ export default function SalesOrderForm() {
                     style={{ background: '#faad14', borderColor: '#faad14' }}
                   >Confirm Payment Received</Button>
                 )}
-                {order?.status === 'payment_confirmed' && (
-                  <Tag color="green" style={{ fontSize: 14, padding: '4px 12px' }}>✅ Payment Confirmed</Tag>
+                {order?.status === 'completed' && (
+                  <Tag color="green" style={{ fontSize: 14, padding: '4px 12px' }}>✅ Order Completed</Tag>
                 )}
               </Space>
             </Card>

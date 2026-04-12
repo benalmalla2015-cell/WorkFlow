@@ -16,20 +16,20 @@ class DocumentController extends Controller
 {
     public function generateQuotation(Order $order)
     {
-        if (!$order->isApproved() && !$order->isCustomerApproved()) {
+        $this->authorizeOrderDocumentAccess($order);
+
+        if (!$order->isApproved() && !$order->isCustomerApproved() && !$order->isPaymentConfirmed() && !$order->isCompleted()) {
             return response()->json(['message' => 'Order must be approved to generate quotation'], 400);
         }
 
         try {
+            $disk = config('workflow.documents_disk', 'public');
+            $root = trim(config('workflow.quotations_root', 'quotations'), '/');
             $filename = 'quotation_' . $order->order_number . '_' . date('Ymd') . '.xlsx';
-            $dir = storage_path('app/public/quotations');
-            if (!is_dir($dir)) mkdir($dir, 0775, true);
-            $fullPath = $dir . '/' . $filename;
-
             $export = new QuotationExport($order);
-            Excel::store($export, 'public/quotations/' . $filename);
+            Excel::store($export, $root . '/' . $filename, $disk);
 
-            $order->update(['quotation_path' => 'quotations/' . $filename]);
+            $order->update(['quotation_path' => $root . '/' . $filename]);
             AuditLog::log('quotation_generated', $order);
 
             return response()->json([
@@ -45,11 +45,15 @@ class DocumentController extends Controller
 
     public function generateInvoice(Order $order)
     {
-        if (!$order->isCustomerApproved()) {
-            return response()->json(['message' => 'Order must be approved by customer to generate invoice'], 400);
+        $this->authorizeOrderDocumentAccess($order);
+
+        if (!$order->payment_confirmed && !$order->isCompleted()) {
+            return response()->json(['message' => 'Order payment must be confirmed before generating invoice'], 400);
         }
 
         try {
+            $disk = config('workflow.documents_disk', 'public');
+            $root = trim(config('workflow.invoices_root', 'invoices'), '/');
             // Generate QR code as base64 PNG
             $qrData = url('/api/orders/verify/' . $order->order_number);
             $qrPng  = QrCode::format('png')->size(120)->margin(1)->generate($qrData);
@@ -61,11 +65,9 @@ class DocumentController extends Controller
             $pdf->setPaper('a4', 'portrait');
 
             $filename = 'invoice_' . $order->order_number . '_' . date('Ymd') . '.pdf';
-            $dir = storage_path('app/public/invoices');
-            if (!is_dir($dir)) mkdir($dir, 0775, true);
-            Storage::disk('public')->put('invoices/' . $filename, $pdf->output());
+            Storage::disk($disk)->put($root . '/' . $filename, $pdf->output());
 
-            $order->update(['invoice_path' => 'invoices/' . $filename]);
+            $order->update(['invoice_path' => $root . '/' . $filename]);
             AuditLog::log('invoice_generated', $order);
 
             return response()->json([
@@ -81,35 +83,66 @@ class DocumentController extends Controller
 
     public function downloadQuotation(Order $order)
     {
+        $this->authorizeOrderDocumentAccess($order);
+
+        $disk = config('workflow.documents_disk', 'public');
+
         if (!$order->quotation_path) {
             return response()->json(['message' => 'Quotation not generated yet'], 404);
         }
-        $path = storage_path('app/public/' . $order->quotation_path);
-        if (!file_exists($path)) {
+
+        if (!Storage::disk($disk)->exists($order->quotation_path)) {
             return response()->json(['message' => 'File not found'], 404);
         }
-        return response()->download($path);
+
+        return Storage::disk($disk)->download($order->quotation_path, basename($order->quotation_path));
     }
 
     public function downloadInvoice(Order $order)
     {
+        $this->authorizeOrderDocumentAccess($order);
+
+        $disk = config('workflow.documents_disk', 'public');
+
         if (!$order->invoice_path) {
             return response()->json(['message' => 'Invoice not generated yet'], 404);
         }
-        $path = storage_path('app/public/' . $order->invoice_path);
-        if (!file_exists($path)) {
+
+        if (!Storage::disk($disk)->exists($order->invoice_path)) {
             return response()->json(['message' => 'File not found'], 404);
         }
-        return response()->download($path);
+
+        return Storage::disk($disk)->download($order->invoice_path, basename($order->invoice_path));
     }
 
     public function downloadAttachment(\App\Models\Attachment $attachment)
     {
-        $path = storage_path('app/public/' . $attachment->path);
-        if (!file_exists($path)) {
+        if (!$attachment->canBeAccessedBy(request()->user())) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $disk = config('workflow.uploads_disk', 'public');
+
+        if (!Storage::disk($disk)->exists($attachment->path)) {
             return response()->json(['message' => 'File not found'], 404);
         }
-        return response()->download($path, $attachment->original_name);
+
+        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+    }
+
+    private function authorizeOrderDocumentAccess(Order $order): void
+    {
+        $user = request()->user();
+
+        if ($user->isAdmin()) {
+            return;
+        }
+
+        if ($user->isSales() && $order->sales_user_id === $user->id) {
+            return;
+        }
+
+        abort(403, 'Unauthorized');
     }
 
     private function prepareInvoiceData($order, $qrBase64)
@@ -117,6 +150,7 @@ class DocumentController extends Controller
         $qty  = max(1, (int)$order->quantity);
         $total = (float)($order->final_price ?? 0);
         $unit  = $qty > 0 ? $total / $qty : 0;
+        $days  = max(1, (int)($order->production_days ?? 30));
 
         return [
             'order'          => $order,
@@ -136,6 +170,7 @@ class DocumentController extends Controller
                 'name'        => $order->product_name,
                 'description' => $order->specifications ?? '',
                 'quantity'    => $qty,
+                'production_days' => $days,
                 'unit_price'  => $unit,
                 'total'       => $total,
             ]],

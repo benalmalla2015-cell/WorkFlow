@@ -23,6 +23,10 @@ class Attachment extends Model
         'description',
     ];
 
+    protected $appends = [
+        'full_url',
+    ];
+
     protected $casts = [
         'file_size' => 'integer',
     ];
@@ -36,14 +40,8 @@ class Attachment extends Model
                 return $builder;
             }
 
-            // Sales users can only see sales uploads
             if ($user->isSales()) {
                 $builder->where('type', 'sales_upload');
-            }
-
-            // Factory users can only see factory uploads
-            if ($user->isFactory()) {
-                $builder->where('type', 'factory_upload');
             }
         });
     }
@@ -60,7 +58,38 @@ class Attachment extends Model
 
     public function getFullUrlAttribute()
     {
-        return Storage::url($this->path);
+        return url('/api/attachments/' . $this->id . '/download');
+    }
+
+    public function canBeAccessedBy(User $user): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        if (!$this->order) {
+            $this->load('order');
+        }
+
+        if (!$this->order) {
+            return false;
+        }
+
+        if ($user->isSales()) {
+            return $this->type === 'sales_upload' && $this->order->sales_user_id === $user->id;
+        }
+
+        if ($user->isFactory()) {
+            $canAccessOrder = $this->order->factory_user_id === $user->id || $this->order->status === 'factory_pricing';
+
+            if (!$canAccessOrder) {
+                return false;
+            }
+
+            return in_array($this->type, ['sales_upload', 'factory_upload'], true);
+        }
+
+        return false;
     }
 
     public function isImage()

@@ -9,7 +9,8 @@ import {
   FilePdfOutlined,
   CheckOutlined,
   DollarOutlined,
-  SearchOutlined
+  SearchOutlined,
+  SendOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 import AppLayout from '../../components/AppLayout';
@@ -115,6 +116,16 @@ const SalesOrders = () => {
     }
   };
 
+  const submitToFactory = async (orderId) => {
+    try {
+      await axios.patch(`/api/orders/${orderId}/status`, { status: 'factory_pricing' });
+      message.success('Order submitted to factory pricing');
+      fetchOrders();
+    } catch (error) {
+      message.error(error.response?.data?.message || 'Failed to submit order to factory');
+    }
+  };
+
   const viewOrder = (order) => {
     setSelectedOrder(order);
     setModalVisible(true);
@@ -193,13 +204,22 @@ const SalesOrders = () => {
           >
             View
           </Button>
-          {(record.status === 'draft' || record.status === 'factory_pricing') && (
+          {record.status === 'draft' && (
             <Button 
               size="small" 
               icon={<EditOutlined />} 
               onClick={() => navigate(`/sales/orders/${record.id}/edit`)}
             >
               Edit
+            </Button>
+          )}
+          {record.status === 'draft' && (
+            <Button
+              size="small"
+              icon={<SendOutlined />}
+              onClick={() => submitToFactory(record.id)}
+            >
+              Send to Factory
             </Button>
           )}
           {record.status === 'approved' && (
@@ -211,7 +231,7 @@ const SalesOrders = () => {
               Quotation
             </Button>
           )}
-          {record.status === 'customer_approved' && (
+          {['payment_confirmed', 'completed'].includes(record.status) && (
             <Button 
               size="small" 
               icon={<FilePdfOutlined />} 

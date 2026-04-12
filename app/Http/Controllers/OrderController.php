@@ -17,14 +17,16 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Order::with(['customer', 'salesUser', 'factoryUser', 'attachments']);
+        $query = Order::with($this->relationsForUser($user));
 
         // Filter based on user role
         if ($user->isSales()) {
             $query->where('sales_user_id', $user->id);
         } elseif ($user->isFactory()) {
-            $query->where('status', 'factory_pricing')
-                  ->orWhere('factory_user_id', $user->id);
+            $query->where(function ($builder) use ($user) {
+                $builder->where('status', 'factory_pricing')
+                        ->orWhere('factory_user_id', $user->id);
+            });
         }
 
         // Apply filters
@@ -93,7 +95,7 @@ class OrderController extends Controller
 
             return response()->json([
                 'message' => 'Order created successfully',
-                'order' => $order->load(['customer', 'attachments'])
+                'order' => $order->load($this->relationsForUser($request->user()))
             ], 201);
 
         } catch (\Exception $e) {
@@ -106,7 +108,7 @@ class OrderController extends Controller
     {
         $this->authorizeOrderAccess($order);
 
-        $order->load(['customer', 'salesUser', 'factoryUser', 'attachments.uploadedBy']);
+        $order->load($this->relationsForUser(request()->user()));
 
         return response()->json($order);
     }
@@ -131,7 +133,7 @@ class OrderController extends Controller
             $oldValues = $order->toArray();
 
             // Update customer if provided
-            if ($request->has('customer')) {
+            if ($request->user()->isSales() && $request->has('customer')) {
                 $order->customer->update($request->customer);
             }
 
@@ -176,7 +178,7 @@ class OrderController extends Controller
 
             return response()->json([
                 'message' => 'Order updated successfully',
-                'order' => $order->load(['customer', 'attachments'])
+                'order' => $order->load($this->relationsForUser($request->user()))
             ]);
 
         } catch (\Exception $e) {
@@ -189,6 +191,10 @@ class OrderController extends Controller
     {
         if (!$request->user()->canApproveOrders()) {
             return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if (!$order->isManagerReview() || !$order->factory_cost) {
+            return response()->json(['message' => 'Order must have factory pricing before approval'], 400);
         }
 
         $validator = $request->validate([
@@ -213,7 +219,7 @@ class OrderController extends Controller
 
             return response()->json([
                 'message' => 'Order approved successfully',
-                'order' => $order->load(['customer', 'attachments'])
+                'order' => $order->load($this->relationsForUser($request->user()))
             ]);
 
         } catch (\Exception $e) {
@@ -221,8 +227,14 @@ class OrderController extends Controller
         }
     }
 
-    public function customerApproval(Order $order)
+    public function customerApproval(Request $request, Order $order)
     {
+        $this->authorizeOrderAccess($order);
+
+        if ($request->user()->isFactory()) {
+            return response()->json(['message' => 'Factory users cannot record customer approval'], 403);
+        }
+
         if (!$order->isApproved()) {
             return response()->json(['message' => 'Order must be approved first'], 400);
         }
@@ -237,20 +249,26 @@ class OrderController extends Controller
         return response()->json(['message' => 'Customer approval recorded']);
     }
 
-    public function confirmPayment(Order $order)
+    public function confirmPayment(Request $request, Order $order)
     {
+        $this->authorizeOrderAccess($order);
+
+        if ($request->user()->isFactory()) {
+            return response()->json(['message' => 'Factory users cannot confirm payment'], 403);
+        }
+
         if (!$order->isCustomerApproved()) {
             return response()->json(['message' => 'Order must be approved by customer first'], 400);
         }
 
         $order->update([
-            'status' => 'payment_confirmed',
+            'status' => 'completed',
             'payment_confirmed' => true,
         ]);
 
         AuditLog::log('payment_confirmed', $order);
 
-        return response()->json(['message' => 'Payment confirmed']);
+        return response()->json(['message' => 'Payment confirmed and order completed']);
     }
 
     public function updateStatus(Request $request, Order $order)
@@ -260,6 +278,22 @@ class OrderController extends Controller
         $validator = $request->validate([
             'status' => ['required', Rule::in(['draft', 'factory_pricing', 'manager_review', 'approved', 'customer_approved', 'payment_confirmed', 'completed'])],
         ]);
+
+        $user = $request->user();
+
+        if ($user->isFactory()) {
+            return response()->json(['message' => 'Factory users cannot change order status directly'], 403);
+        }
+
+        if ($user->isSales()) {
+            if ($order->sales_user_id !== $user->id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if ($order->status !== 'draft' || $request->status !== 'factory_pricing') {
+                return response()->json(['message' => 'Sales users can only submit draft orders to factory pricing'], 422);
+            }
+        }
 
         $oldStatus = $order->status;
         $order->update(['status' => $request->status]);
@@ -295,17 +329,31 @@ class OrderController extends Controller
             $rules['production_days'] = 'required|integer|min:1';
         }
 
-        $rules['attachments.*'] = 'nullable|file|max:10240'; // 10MB max
+        $rules['attachments.*'] = 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240';
 
         return validator($request->all(), $rules);
+    }
+
+    private function relationsForUser($user): array
+    {
+        $relations = ['salesUser', 'factoryUser', 'attachments.uploadedBy'];
+
+        if (!$user->isFactory()) {
+            $relations[] = 'customer';
+        }
+
+        return $relations;
     }
 
     private function handleAttachments($request, $order, $type)
     {
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                $folder = $type === 'sales_upload' ? 'sales_uploads' : 'factory_uploads';
-                $path = $file->store($folder, 'public');
+                $disk = config('workflow.uploads_disk', 'public');
+                $folder = $type === 'sales_upload'
+                    ? config('workflow.sales_upload_root', 'sales_uploads')
+                    : config('workflow.factory_upload_root', 'factory_uploads');
+                $path = $file->store($folder, $disk);
 
                 Attachment::create([
                     'order_id' => $order->id,
