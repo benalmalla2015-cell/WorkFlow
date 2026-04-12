@@ -13,7 +13,13 @@ export const useAuth = () => {
   return context;
 };
 
-const getStoredToken = () => localStorage.getItem(TOKEN_KEY) || null;
+const getStoredToken = () => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token || token === 'undefined' || token === 'null') {
+    return null;
+  }
+  return token;
+};
 
 const clearAuthState = () => {
   localStorage.removeItem(TOKEN_KEY);
@@ -52,6 +58,15 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.post('/api/login', credentials);
       const { user, token } = response.data;
+
+      if (!token || !user || !user.role) {
+        clearAuthState();
+        setUser(null);
+        return {
+          success: false,
+          error: 'Unexpected login response. Please try again.'
+        };
+      }
       
       localStorage.setItem(TOKEN_KEY, token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
