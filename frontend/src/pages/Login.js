@@ -31,14 +31,14 @@ const Login = () => {
 
     if (result.success) {
       setSuccessMsg('Login successful! Redirecting...');
-      // Navigate directly to role-based page
+      const role = result.user?.role || 'sales';
+      const path = role === 'admin' ? '/admin/dashboard'
+        : role === 'sales' ? '/sales/orders'
+        : '/factory/orders';
+      // Full page reload ensures fresh auth state is loaded
       setTimeout(() => {
-        const role = result.user?.role || 'sales';
-        const path = role === 'admin' ? '/admin/dashboard'
-          : role === 'sales' ? '/sales/orders'
-          : '/factory/orders';
-        navigate(path, { replace: true });
-      }, 500);
+        window.location.href = path;
+      }, 800);
     } else {
       setErrorMsg(result.error || 'Login failed. Please check your credentials.');
     }
