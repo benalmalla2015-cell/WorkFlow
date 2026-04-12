@@ -3,7 +3,7 @@
 # WorkFlow System - One-Command Server Setup Script
 # Run on Hostinger SSH Terminal
 # ================================================================
-set -e
+set -euo pipefail
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
@@ -14,73 +14,82 @@ echo ""
 BASE="/home/u859266589/domains/dayancosys.com"
 APP="$BASE/laravel_app"
 WEB="$BASE/public_html"
-REPO="https://github.com/benalmalla2015-cell/WorkFlow.git"
+ARCHIVE="${ARCHIVE:-/home/u859266589/workflow_release.zip}"
+STAMP=$(date +%Y%m%d_%H%M%S)
+RELEASE="$BASE/laravel_app_release_$STAMP"
+BACKUP="$BASE/laravel_app_backup_$STAMP"
 
-# ── Step 1: Clone repo ──────────────────────────────────────────
-echo "▶ [1/8] Cloning WorkFlow repository..."
-rm -rf "$APP"
-git clone "$REPO" "$APP"
-echo "  ✓ Repository cloned"
+echo "▶ [1/7] Extracting uploaded release archive..."
+if [ ! -f "$ARCHIVE" ]; then
+    echo "Archive not found at $ARCHIVE"
+    exit 1
+fi
 
-# ── Step 2: Composer install ────────────────────────────────────
-echo "▶ [2/8] Installing PHP dependencies..."
-cd "$APP"
+rm -rf "$RELEASE"
+mkdir -p "$RELEASE"
+unzip -q -o "$ARCHIVE" -d "$RELEASE"
+mkdir -p "$RELEASE/bootstrap/cache"
+mkdir -p "$RELEASE/storage/app/public"
+mkdir -p "$RELEASE/storage/framework/cache/data"
+mkdir -p "$RELEASE/storage/framework/sessions"
+mkdir -p "$RELEASE/storage/framework/views"
+mkdir -p "$RELEASE/storage/logs"
+chmod -R 775 "$RELEASE/storage" "$RELEASE/bootstrap/cache"
+echo "  ✓ Release extracted"
+
+echo "▶ [2/7] Preserving runtime environment and storage..."
+if [ -f "$APP/.env" ]; then
+    cp "$APP/.env" "$RELEASE/.env"
+fi
+if [ -f "$APP/composer.lock" ]; then
+    cp "$APP/composer.lock" "$RELEASE/composer.lock"
+fi
+if [ -d "$APP/storage/app/public" ]; then
+    cp -a "$APP/storage/app/public/." "$RELEASE/storage/app/public/"
+fi
+if [ -d "$APP/storage/logs" ]; then
+    cp -a "$APP/storage/logs/." "$RELEASE/storage/logs/"
+fi
+if [ ! -f "$RELEASE/.env" ] && [ -f "$RELEASE/.env.example" ]; then
+    cp "$RELEASE/.env.example" "$RELEASE/.env"
+fi
+if [ ! -f "$RELEASE/.env" ]; then
+    echo "Missing .env file. Create $APP/.env or provide one in the archive."
+    exit 1
+fi
+mv "$RELEASE/.env.production" "$RELEASE/.env.production.bak_runtime" 2>/dev/null || true
+echo "  ✓ Runtime files preserved"
+
+echo "▶ [3/7] Installing PHP dependencies..."
+cd "$RELEASE"
 composer install --no-dev --optimize-autoloader --no-interaction --quiet
 echo "  ✓ Dependencies installed"
 
-# ── Step 3: .env setup ──────────────────────────────────────────
-echo "▶ [3/8] Configuring environment..."
-cat > "$APP/.env" << 'ENVEOF'
-APP_NAME="WorkFlow"
-APP_ENV=production
-APP_KEY=
-APP_DEBUG=false
-APP_URL=https://dayancosys.com
+echo "▶ [4/7] Validating and preparing Laravel app..."
+php artisan optimize:clear --quiet || true
+php artisan about --only=environment >/dev/null
+php artisan route:list >/dev/null
+if ! grep -q '^APP_KEY=base64:' .env; then
+    php artisan key:generate --force --quiet
+fi
+echo "  ✓ Application validated"
 
-LOG_CHANNEL=stack
-LOG_LEVEL=error
-
-DB_CONNECTION=mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_DATABASE=workflow_db
-DB_USERNAME=workflow_user
-DB_PASSWORD=change_me
-
-CACHE_DRIVER=file
-FILESYSTEM_DISK=local
-QUEUE_CONNECTION=sync
-SESSION_DRIVER=file
-SESSION_LIFETIME=120
-ENVEOF
-
-php artisan key:generate --force --quiet
-echo "  ✓ Environment configured"
-
-# ── Step 4: Permissions ─────────────────────────────────────────
-echo "▶ [4/8] Setting permissions..."
-chmod -R 775 "$APP/storage" "$APP/bootstrap/cache"
-echo "  ✓ Permissions set"
-
-# ── Step 5: Database ────────────────────────────────────────────
-echo "▶ [5/8] Running migrations and seeders..."
+echo "▶ [5/7] Running migrations and seeders..."
 php artisan migrate --force --quiet
 php artisan db:seed --force --quiet
-echo "  ✓ Database ready with default users"
+echo "  ✓ Database ready"
 
-# ── Step 6: Deploy public files ─────────────────────────────────
-echo "▶ [6/8] Deploying web files..."
-
-# Backup existing public_html
-if [ -d "$WEB" ] && [ "$(ls -A $WEB)" ]; then
-    mv "$WEB" "${WEB}_backup_$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+echo "▶ [6/7] Activating release..."
+if [ -d "$APP" ]; then
+    mv "$APP" "$BACKUP"
 fi
-mkdir -p "$WEB"
-
-# Copy Laravel public folder to public_html
-cp -r "$APP/public/." "$WEB/"
-
-# Fix paths in index.php to point to correct laravel_app location
+mv "$RELEASE" "$APP"
+cd "$APP"
+mv .env.production .env.production.bak_runtime 2>/dev/null || true
+php artisan optimize:clear --quiet || true
+php artisan config:cache --quiet
+php artisan route:cache --quiet
+php artisan view:cache --quiet
 cat > "$WEB/index.php" << INDEXEOF
 <?php
 define('LARAVEL_START', microtime(true));
@@ -95,43 +104,25 @@ require '$APP/vendor/autoload.php';
 )->send();
 \$kernel->terminate(\$request, \$response);
 INDEXEOF
+cat > "$WEB/.htaccess" << 'HTACCESS'
+<IfModule mod_rewrite.c>
+    RewriteEngine On
 
-# Copy .htaccess to public_html
-cp "$APP/.htaccess" "$WEB/.htaccess"
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-echo "  ✓ Web files deployed"
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
 
-# ── Step 7: Storage symlink ─────────────────────────────────────
-echo "▶ [7/8] Creating storage link..."
-cd "$APP"
-php artisan storage:link --quiet 2>/dev/null || true
-echo "  ✓ Storage linked"
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+HTACCESS
+echo "  ✓ Release activated"
 
-# ── Step 8: Cache & optimize ────────────────────────────────────
-echo "▶ [8/8] Optimizing application..."
-php artisan config:cache --quiet
-php artisan route:cache --quiet
-php artisan view:cache --quiet
-echo "  ✓ Application optimized"
-
-# ── Setup daily backup cron ─────────────────────────────────────
-CRON_JOB="0 2 * * * mysqldump -u workflow_user -pchange_me workflow_db > /home/u859266589/backups/workflow_\$(date +\%Y\%m\%d).sql 2>/dev/null"
-mkdir -p /home/u859266589/backups
-(crontab -l 2>/dev/null | grep -v "workflow"; echo "$CRON_JOB") | crontab -
-
-# ── Final Report ────────────────────────────────────────────────
-echo ""
-echo "╔══════════════════════════════════════════════════════╗"
-echo "║            ✅  Deployment Successful!                ║"
-echo "╠══════════════════════════════════════════════════════╣"
-echo "║  🌐  URL:     https://dayancosys.com                 ║"
-echo "║                                                      ║"
-echo "║  🔑  LOGIN CREDENTIALS:                              ║"
-echo "║  Admin:    admin@workflow.com   / admin123           ║"
-echo "║  Sales:    sales@workflow.com   / sales123           ║"
-echo "║  Factory:  factory@workflow.com / factory123         ║"
-echo "║                                                      ║"
-echo "║  ⚠️   Change passwords after first login!            ║"
-echo "║  📦  Daily DB backup set at 2:00 AM                  ║"
-echo "╚══════════════════════════════════════════════════════╝"
+echo "▶ [7/7] Deployment completed"
+echo "  ✓ Live URL: https://dayancosys.com"
+echo "  ✓ Backup: $BACKUP"
 echo ""

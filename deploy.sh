@@ -2,206 +2,138 @@
 
 # WorkFlow System Deployment Script
 # This script deploys the WorkFlow system to Hostinger
+set -euo pipefail
 
 echo "🚀 Starting WorkFlow System Deployment..."
 
-# Set variables
-REPO_URL="https://github.com/benalmalla2015-cell/WorkFlow.git"
-SSH_HOST="u859266589@45.13.255.111"
-SSH_PORT="65002"
-DEPLOY_PATH="/home/u859266589/domains/dayancosys.com/public_html"
-BACKUP_PATH="/home/u859266589/backups"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SSH_HOST="${SSH_HOST:-u859266589@45.13.255.111}"
+SSH_PORT="${SSH_PORT:-65002}"
+BASE_PATH="${BASE_PATH:-/home/u859266589/domains/dayancosys.com}"
+APP_PATH="${APP_PATH:-$BASE_PATH/laravel_app}"
+BACKUP_PATH="${BACKUP_PATH:-/home/u859266589/backups}"
+ARCHIVE_PATH_LOCAL="$(mktemp "${TMPDIR:-/tmp}/workflow_release_XXXXXX.zip")"
+ARCHIVE_PATH_REMOTE="${ARCHIVE_PATH_REMOTE:-/home/u859266589/workflow_release.zip}"
 
-echo "📦 Step 1: Preparing local repository..."
+cleanup() {
+    rm -f "$ARCHIVE_PATH_LOCAL"
+}
 
-# Add all files to git
-git add .
-git commit -m "Complete WorkFlow system implementation - $TIMESTAMP"
-git push origin main
+trap cleanup EXIT
 
-echo "🔐 Step 2: Creating backup on server..."
+echo "📦 Step 1: Packaging current git HEAD..."
+git -C "$REPO_ROOT" archive --format=zip --output="$ARCHIVE_PATH_LOCAL" HEAD
 
-# Create backup directory if it doesn't exist
-ssh -p $SSH_PORT $SSH_HOST "mkdir -p $BACKUP_PATH"
+echo "📤 Step 2: Uploading release archive..."
+scp -P "$SSH_PORT" "$ARCHIVE_PATH_LOCAL" "$SSH_HOST:$ARCHIVE_PATH_REMOTE"
 
-# Backup current deployment
-ssh -p $SSH_PORT $SSH_HOST "if [ -d '$DEPLOY_PATH' ]; then cp -r $DEPLOY_PATH $BACKUP_PATH/backup_$TIMESTAMP; fi"
+echo "🛠️ Step 3: Deploying release on server..."
+ssh -p "$SSH_PORT" "$SSH_HOST" "ARCHIVE_PATH_REMOTE='$ARCHIVE_PATH_REMOTE' BASE_PATH='$BASE_PATH' APP_PATH='$APP_PATH' BACKUP_PATH='$BACKUP_PATH' bash -s" <<'REMOTE'
+set -euo pipefail
 
-echo "📁 Step 3: Deploying to server..."
+STAMP=$(date +%Y%m%d_%H%M%S)
+RELEASE_PATH="${BASE_PATH}/laravel_app_release_${STAMP}"
+BACKUP_APP_PATH="${BASE_PATH}/laravel_app_backup_${STAMP}"
 
-# Clone or update the repository
-ssh -p $SSH_PORT $SSH_HOST "
-cd $DEPLOY_PATH && \
-if [ -d '.git' ]; then \
-    git pull origin main; \
-else \
-    git clone $REPO_URL temp && \
-    mv temp/* . && \
-    mv temp/.* . 2>/dev/null || true && \
-    rm -rf temp; \
+mkdir -p "$BACKUP_PATH"
+rm -rf "$RELEASE_PATH"
+mkdir -p "$RELEASE_PATH"
+unzip -q -o "$ARCHIVE_PATH_REMOTE" -d "$RELEASE_PATH"
+mkdir -p "$RELEASE_PATH/bootstrap/cache"
+mkdir -p "$RELEASE_PATH/storage/app/public"
+mkdir -p "$RELEASE_PATH/storage/framework/cache/data"
+mkdir -p "$RELEASE_PATH/storage/framework/sessions"
+mkdir -p "$RELEASE_PATH/storage/framework/views"
+mkdir -p "$RELEASE_PATH/storage/logs"
+chmod -R 775 "$RELEASE_PATH/storage" "$RELEASE_PATH/bootstrap/cache"
+
+if [ -f "$APP_PATH/.env" ]; then
+    cp "$APP_PATH/.env" "$RELEASE_PATH/.env"
 fi
-"
 
-echo "🔧 Step 4: Installing dependencies..."
+if [ -f "$APP_PATH/composer.lock" ]; then
+    cp "$APP_PATH/composer.lock" "$RELEASE_PATH/composer.lock"
+fi
 
-# Install PHP dependencies
-ssh -p $SSH_PORT $SSH_HOST "
-cd $DEPLOY_PATH && \
-composer install --no-dev --optimize-autoloader
-"
+if [ -d "$APP_PATH/storage/app/public" ]; then
+    cp -a "$APP_PATH/storage/app/public/." "$RELEASE_PATH/storage/app/public/"
+fi
 
-echo "🎨 Step 5: Building frontend..."
+if [ -d "$APP_PATH/storage/logs" ]; then
+    cp -a "$APP_PATH/storage/logs/." "$RELEASE_PATH/storage/logs/"
+fi
 
-# Build React frontend
-ssh -p $SSH_PORT $SSH_HOST "
-cd $DEPLOY_PATH/frontend && \
-npm install && \
-npm run build
-"
+if [ ! -f "$RELEASE_PATH/.env" ]; then
+    echo "Missing production .env file at $APP_PATH/.env" >&2
+    exit 1
+fi
 
-echo "🗄️ Step 6: Setting up database..."
-
-# Run database migrations
-ssh -p $SSH_PORT $SSH_HOST "
-cd $DEPLOY_PATH && \
+cd "$RELEASE_PATH"
+composer install --no-dev --optimize-autoloader --no-interaction
+php artisan optimize:clear
+php artisan about --only=environment >/dev/null
+php artisan route:list >/dev/null
 php artisan migrate --force
-"
-
-# Seed database (only on first deployment)
-ssh -p $SSH_PORT $SSH_HOST "
-cd $DEPLOY_PATH && \
-if ! php artisan tinker --execute='App\Models\User::count()' > /dev/null 2>&1; then \
-    php artisan db:seed --class=DatabaseSeeder --force; \
-fi
-"
-
-echo "🔒 Step 7: Setting permissions..."
-
-# Set proper permissions
-ssh -p $SSH_PORT $SSH_HOST "
-cd $DEPLOY_PATH && \
-chmod -R 755 storage bootstrap/cache && \
-chown -R u859266589:u859266589 storage bootstrap/cache
-"
-
-echo "🎯 Step 8: Optimizing application..."
-
-# Clear and cache configurations
-ssh -p $SSH_PORT $SSH_HOST "
-cd $DEPLOY_PATH && \
-php artisan config:clear && \
-php artisan config:cache && \
-php artisan route:clear && \
-php artisan route:cache && \
-php artisan view:clear && \
+php artisan db:seed --force
+mv .env.production .env.production.bak_runtime 2>/dev/null || true
+php artisan config:cache
+php artisan route:cache
 php artisan view:cache
-"
 
-echo "🌐 Step 9: Configuring web server..."
+if [ -d "$APP_PATH" ]; then
+    mv "$APP_PATH" "$BACKUP_APP_PATH"
+fi
 
-# Create .htaccess for Laravel
-ssh -p $SSH_PORT $SSH_HOST "
-cd $DEPLOY_PATH && \
-cat > .htaccess << 'EOF'
+mv "$RELEASE_PATH" "$APP_PATH"
+cd "$APP_PATH"
+mv .env.production .env.production.bak_runtime 2>/dev/null || true
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+cat > "${BASE_PATH}/public_html/index.php" <<PHP
+<?php
+define('LARAVEL_START', microtime(true));
+
+if (file_exists(\$maintenance = '${APP_PATH}/storage/framework/maintenance.php')) {
+    require \$maintenance;
+}
+
+require '${APP_PATH}/vendor/autoload.php';
+
+\$app = require_once '${APP_PATH}/bootstrap/app.php';
+
+\$kernel = \$app->make(Illuminate\Contracts\Http\Kernel::class);
+
+\$response = \$kernel->handle(
+    \$request = Illuminate\Http\Request::capture()
+)->send();
+
+\$kernel->terminate(\$request, \$response);
+PHP
+
+cat > "${BASE_PATH}/public_html/.htaccess" <<'HTACCESS'
 <IfModule mod_rewrite.c>
-    <IfModule mod_negotiation.c>
-        Options -MultiViews -Indexes
-    </IfModule>
-
     RewriteEngine On
 
-    # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
-    # Send Requests To Frontend...
-    RewriteCond %{REQUEST_URI} ^/$ [OR]
-    RewriteCond %{REQUEST_URI} ^/(login|dashboard|sales|factory|admin) [NC]
-    RewriteRule ^ frontend/build/index.html [L]
-
-    # Send Requests To Frontend Static Files...
-    RewriteCond %{REQUEST_URI} ^/static/ [NC]
-    RewriteRule ^(.*)$ frontend/build/$1 [L]
-
-    # Send Requests To API...
-    RewriteCond %{REQUEST_URI} ^/api/ [NC]
-    RewriteRule ^ index.php [L]
-
-    # Handle All Other Requests...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
-EOF
-"
+HTACCESS
 
-echo "🔐 Step 10: Setting up environment file..."
-
-# Create .env file with production settings
-ssh -p $SSH_PORT $SSH_HOST "
-cd $DEPLOY_PATH && \
-if [ ! -f '.env' ]; then \
-    cp .env.example .env && \
-    php artisan key:generate --force
-fi
-"
-
-echo "📊 Step 11: Setting up automated backups..."
-
-# Create backup script
-ssh -p $SSH_PORT $SSH_HOST "
-cat > backup_workflow.sh << 'EOF'
-#!/bin/bash
-# Automated backup script for WorkFlow system
-
-BACKUP_DIR=\"/home/u859266589/backups\"
-TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
-DB_NAME=\"workflow_db\"
-DB_USER=\"workflow_user\"
-DB_PASS=\"change_me\"
-
-# Create database backup
-mysqldump -u \$DB_USER -p\"\$DB_PASS\" \$DB_NAME > \$BACKUP_DIR/db_backup_\$TIMESTAMP.sql
-
-# Compress backup
-gzip \$BACKUP_DIR/db_backup_\$TIMESTAMP.sql
-
-# Keep only last 7 days of backups
-find \$BACKUP_DIR -name \"db_backup_*.sql.gz\" -mtime +7 -delete
-
-echo \"Backup completed: \$TIMESTAMP\"
-EOF
-
-chmod +x backup_workflow.sh
-
-# Add to crontab for daily backup at 2 AM
-(crontab -l 2>/dev/null; echo \"0 2 * * * /home/u859266589/backup_workflow.sh\") | crontab -
-"
+echo "Backup saved at: $BACKUP_APP_PATH"
+REMOTE
 
 echo "✅ Deployment completed successfully!"
-echo ""
 echo "🌐 Your WorkFlow system is now live at: https://dayancosys.com"
-echo ""
-echo "🔑 Default Login Credentials:"
-echo "   Admin: admin@workflow.com / admin123"
-echo "   Sales: sales@workflow.com / sales123"
-echo "   Factory: factory@workflow.com / factory123"
-echo ""
-echo "📚 Next Steps:"
-echo "   1. Update AWS S3 credentials in .env file"
-echo "   2. Configure email settings for notifications"
-echo "   3. Change default passwords for security"
-echo "   4. Set up SSL certificate if not already configured"
-echo ""
-echo "🔧 Important Files:"
-echo "   - Environment: $DEPLOY_PATH/.env"
-echo "   - Logs: $DEPLOY_PATH/storage/logs"
-echo "   - Backups: $BACKUP_PATH"
-echo ""
-echo "🎉 WorkFlow System Deployment Complete!"
+echo "🔧 Runtime app path: $APP_PATH"
+echo "📦 Backup path: $BACKUP_PATH"
