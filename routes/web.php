@@ -9,9 +9,13 @@ use Illuminate\Support\Facades\File;
 |--------------------------------------------------------------------------
 */
 
-// Root redirect to login
+// Root - serve the SPA (React handles auth redirect client-side)
 Route::get('/', function () {
-    return redirect('/login');
+    $buildPath = public_path('frontend/build/index.html');
+    if (File::exists($buildPath)) {
+        return response(File::get($buildPath));
+    }
+    return view('welcome');
 });
 
 // Serve the SPA for all non-api routes

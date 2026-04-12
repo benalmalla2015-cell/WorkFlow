@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Form, Input, Button, Card, message, Divider, Typography } from 'antd';
+import { useNavigate, Navigate } from 'react-router-dom';
+import { Form, Input, Button, Card, Alert, Divider, Typography } from 'antd';
 import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -8,26 +8,40 @@ const { Title, Text } = Typography;
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const { login, isAuthenticated, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
+  const [form] = Form.useForm();
+
+  // If already authenticated, redirect to role dashboard
+  if (!authLoading && isAuthenticated && user) {
+    const path = user.role === 'admin' ? '/admin/dashboard'
+      : user.role === 'sales' ? '/sales/orders'
+      : '/factory/orders';
+    return <Navigate to={path} replace />;
+  }
 
   const handleSubmit = async (values) => {
     setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
     const result = await login(values);
     setLoading(false);
 
     if (result.success) {
-      message.success('Login successful');
-      navigate('/');
+      setSuccessMsg('Login successful! Redirecting...');
+      // Navigate directly to role-based page
+      setTimeout(() => {
+        const role = result.user?.role || 'sales';
+        const path = role === 'admin' ? '/admin/dashboard'
+          : role === 'sales' ? '/sales/orders'
+          : '/factory/orders';
+        navigate(path, { replace: true });
+      }, 500);
     } else {
-      message.error(result.error || 'Login failed. Please check your credentials.');
+      setErrorMsg(result.error || 'Login failed. Please check your credentials.');
     }
-  };
-
-  const fillDemo = (email, password) => {
-    // Handled via button click fill
-    document.querySelector('input[id="email"]').value = email;
-    document.querySelector('input[id="password"]').value = password;
   };
 
   return (
@@ -55,7 +69,15 @@ const Login = () => {
           <Text type="secondary">Business Management System</Text>
         </div>
 
+        {successMsg && (
+          <Alert message={successMsg} type="success" showIcon style={{ marginBottom: 16 }} />
+        )}
+        {errorMsg && (
+          <Alert message={errorMsg} type="error" showIcon style={{ marginBottom: 16 }} />
+        )}
+
         <Form
+          form={form}
           name="login"
           layout="vertical"
           onFinish={handleSubmit}
@@ -129,14 +151,7 @@ const Login = () => {
                 transition: 'all 0.2s',
               }}
               onClick={() => {
-                const form = document.querySelector('form');
-                if (form) {
-                  const emailInput = form.querySelector('input[type="email"], input:not([type])');
-                  const passwordInput = form.querySelector('input[type="password"]');
-                  if (emailInput) emailInput.value = email;
-                  if (passwordInput) passwordInput.value = pass;
-                }
-                // Use antd form approach
+                form.setFieldsValue({ email, password: pass });
               }}
               onMouseEnter={(e) => { e.currentTarget.style.background = `${color}10`; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = '#f8f9fa'; }}

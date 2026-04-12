@@ -43,11 +43,11 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.post('/api/login', credentials);
       const { user, token } = response.data;
       
-      Cookies.set('token', token, { expires: 7 });
+      Cookies.set('token', token, { expires: 7, sameSite: 'Lax' });
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(user);
       
-      return { success: true };
+      return { success: true, user };
     } catch (error) {
       return { 
         success: false, 
