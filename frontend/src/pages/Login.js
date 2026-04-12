@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Form, Input, Button, Card, Alert, Divider, Typography } from 'antd';
 import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
@@ -10,29 +10,32 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const { login } = useAuth();
+  const { login, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [form] = Form.useForm();
+
+  // Redirect when user state updates after login
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const role = user.role || 'sales';
+      const path = role === 'admin' ? '/admin/dashboard'
+        : role === 'sales' ? '/sales/orders'
+        : '/factory/orders';
+      navigate(path, { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const handleSubmit = async (values) => {
     setLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
     const result = await login(values);
+    setLoading(false);
 
     if (result.success) {
       setSuccessMsg('Login successful! Redirecting...');
-      // Data is now in localStorage, navigate and let React handle it
-      const role = result.user?.role || 'sales';
-      const path = role === 'admin' ? '/admin/dashboard'
-        : role === 'sales' ? '/sales/orders'
-        : '/factory/orders';
-      
-      // Navigate first (instant)
-      navigate(path, { replace: true });
-      setLoading(false);
+      // useEffect above will handle navigation when state updates
     } else {
-      setLoading(false);
       setErrorMsg(result.error || 'Login failed. Please check your credentials.');
     }
   };
