@@ -205,7 +205,7 @@ class Order extends Model
             return in_array($this->status, ['draft', 'factory_pricing']);
         }
 
-        if ($user->isFactory() && $this->factory_user_id === $user->id) {
+        if ($user->isFactory()) {
             return $this->status === 'factory_pricing';
         }
 

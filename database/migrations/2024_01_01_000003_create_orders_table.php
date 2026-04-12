@@ -24,15 +24,15 @@ return new class extends Migration
             $table->text('specifications')->nullable();
             
             // Factory data (encrypted, hidden from sales)
-            $table->string('supplier_name')->nullable();
-            $table->string('product_code')->nullable();
-            $table->decimal('factory_cost', 10, 2)->nullable();
+            $table->text('supplier_name')->nullable();
+            $table->string('product_code', 500)->nullable();
+            $table->text('factory_cost')->nullable();
             $table->integer('production_days')->nullable();
             
             // Pricing (encrypted)
-            $table->decimal('selling_price', 10, 2)->nullable();
+            $table->text('selling_price')->nullable();
             $table->decimal('profit_margin_percentage', 5, 2)->default(0);
-            $table->decimal('final_price', 10, 2)->nullable();
+            $table->text('final_price')->nullable();
             
             // Status tracking
             $table->enum('status', ['draft', 'factory_pricing', 'manager_review', 'approved', 'customer_approved', 'payment_confirmed', 'completed'])->default('draft');
