@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="WorkFlow Management System - Complete Business Management Solution" />
+    <title>WorkFlow System - Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-container {
+            background: white;
+            padding: 3rem;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        .logo {
+            text-align: center;
+            font-size: 3rem;
+            margin-bottom: 2rem;
+        }
+        .title {
+            text-align: center;
+            font-size: 1.8rem;
+            color: #333;
+            margin-bottom: 2rem;
+            font-weight: 600;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        .demo-accounts {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #eee;
+        }
+        .demo-accounts h3 {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        .demo-account {
+            background: #f8f9fa;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+        .demo-account strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="login-container">
+            <div class="logo">🏢</div>
+            <h1 class="title">WorkFlow System</h1>
+            
+            <div id="message"></div>
+            
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required placeholder="Enter your email">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                </div>
+                
+                <button type="submit" class="login-btn" id="loginBtn">
+                    🚀 Login to System
+                </button>
+            </form>
+            
+            <div class="demo-accounts">
+                <h3>Demo Accounts:</h3>
+                <div class="demo-account">
+                    <strong>Admin:</strong> admin@workflow.com / admin123
+                </div>
+                <div class="demo-account">
+                    <strong>Sales:</strong> sales@workflow.com / sales123
+                </div>
+                <div class="demo-account">
+                    <strong>Factory:</strong> factory@workflow.com / factory123
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const loginBtn = document.getElementById('loginBtn');
+        const messageDiv = document.getElementById('message');
+
+        function showMessage(message, type = 'error') {
+            messageDiv.innerHTML = `<div class="${type}">${message}</div>`;
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = '🔄 Logging in...';
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    showMessage('Login successful! Redirecting...', 'success');
+                    
+                    // Redirect based on user role
+                    setTimeout(() => {
+                        if (data.user.role === 'admin') {
+                            window.location.href = '/admin/dashboard';
+                        } else if (data.user.role === 'sales') {
+                            window.location.href = '/sales/orders';
+                        } else if (data.user.role === 'factory') {
+                            window.location.href = '/factory/orders';
+                        } else {
+                            window.location.href = '/dashboard';
+                        }
+                    }, 1500);
+                } else {
+                    showMessage(data.message || 'Login failed. Please check your credentials.');
+                }
+            } catch (error) {
+                showMessage('Network error. Please try again.');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = '🚀 Login to System';
+            }
+        });
+
+        // Auto-fill demo accounts on click
+        document.querySelectorAll('.demo-account').forEach(account => {
+            account.style.cursor = 'pointer';
+            account.addEventListener('click', function() {
+                const text = this.textContent;
+                if (text.includes('Admin')) {
+                    document.getElementById('email').value = 'admin@workflow.com';
+                    document.getElementById('password').value = 'admin123';
+                } else if (text.includes('Sales')) {
+                    document.getElementById('email').value = 'sales@workflow.com';
+                    document.getElementById('password').value = 'sales123';
+                } else if (text.includes('Factory')) {
+                    document.getElementById('email').value = 'factory@workflow.com';
+                    document.getElementById('password').value = 'factory123';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
