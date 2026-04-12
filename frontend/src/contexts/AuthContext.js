@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-import Cookies from 'js-cookie';
 
 const AuthContext = createContext();
+
+const TOKEN_KEY = 'wf_token';
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -17,7 +18,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = Cookies.get('token');
+    const token = localStorage.getItem(TOKEN_KEY);
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       fetchUser();
@@ -43,7 +44,7 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.post('/api/login', credentials);
       const { user, token } = response.data;
       
-      Cookies.set('token', token, { expires: 7, sameSite: 'Lax' });
+      localStorage.setItem(TOKEN_KEY, token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(user);
       
@@ -62,7 +63,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      Cookies.remove('token');
+      localStorage.removeItem(TOKEN_KEY);
       delete axios.defaults.headers.common['Authorization'];
       setUser(null);
     }
