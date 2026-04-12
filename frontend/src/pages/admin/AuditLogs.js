@@ -3,6 +3,7 @@ import { Table, Card, Input, Select, DatePicker, Tag, Space } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
+import AppLayout from '../../components/AppLayout';
 import moment from 'moment';
 
 const { Option } = Select;
@@ -134,7 +135,8 @@ const AuditLogs = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <AppLayout>
+    <div style={{ padding: '0' }}>
       <Card title="Audit Logs">
         {/* Filters */}
         <div style={{ marginBottom: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
@@ -186,6 +188,7 @@ const AuditLogs = () => {
         />
       </Card>
     </div>
+    </AppLayout>
   );
 };
 

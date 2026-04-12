@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useAuth } from '../../contexts/AuthContext';
+import AppLayout from '../../components/AppLayout';
 import axios from 'axios';
 
 const AdminDashboard = () => {
@@ -148,7 +149,8 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <AppLayout>
+    <div style={{ padding: '0' }}>
       <h2>Admin Dashboard</h2>
       
       {/* Statistics Cards */}
@@ -326,6 +328,7 @@ const AdminDashboard = () => {
         )}
       </Modal>
     </div>
+    </AppLayout>
   );
 };
 

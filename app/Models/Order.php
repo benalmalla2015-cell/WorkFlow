@@ -38,14 +38,13 @@ class Order extends Model
     ];
 
     protected $casts = [
-        'factory_cost' => 'decimal:2',
-        'selling_price' => 'decimal:2',
-        'final_price' => 'decimal:2',
         'profit_margin_percentage' => 'decimal:2',
         'customer_approval' => 'boolean',
         'payment_confirmed' => 'boolean',
         'manager_approval' => 'boolean',
     ];
+    // Note: factory_cost, selling_price, final_price, customer_notes, supplier_name
+    // are handled via encrypt/decrypt mutators below - do NOT cast them here
 
     protected static function booted()
     {

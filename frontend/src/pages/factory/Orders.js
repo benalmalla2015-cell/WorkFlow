@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Card, Button, Tag, Space, message, Modal, Input, Select, DatePicker, Spin } from 'antd';
+import { Table, Card, Button, Tag, Space, message, Modal, Row, Col, Select, DatePicker } from 'antd';
 import { 
   EyeOutlined, 
   EditOutlined, 
@@ -8,6 +8,7 @@ import {
   ToolOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
+import AppLayout from '../../components/AppLayout';
 import axios from 'axios';
 import moment from 'moment';
 
@@ -162,7 +163,8 @@ const FactoryOrders = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <AppLayout>
+    <div style={{ padding: '0' }}>
       <Card title="Factory Orders - Pending Pricing">
         {/* Filters */}
         <div style={{ marginBottom: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
@@ -258,7 +260,7 @@ const FactoryOrders = () => {
             )}
 
             <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '4px' }}>
-              <strong style={{ color: '#d46b08 }}>🔒 Privacy Notice:</strong>
+              <strong style={{ color: '#d46b08' }}>🔒 Privacy Notice:</strong>
               <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#d46b08' }}>
                 Customer information is hidden for privacy. You can only view technical specifications and attachments.
               </p>
@@ -267,6 +269,7 @@ const FactoryOrders = () => {
         )}
       </Modal>
     </div>
+    </AppLayout>
   );
 };
 

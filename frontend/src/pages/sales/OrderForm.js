@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Form, Input, Button, Card, Row, Col, Upload, message, Spin, Select, InputNumber } from 'antd';
 import { UploadOutlined, SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
+import AppLayout from '../../components/AppLayout';
 import axios from 'axios';
 
 const { TextArea } = Input;
@@ -114,11 +115,12 @@ const SalesOrderForm = () => {
   };
 
   if (loading && id) {
-    return <Spin size="large" style={{ display: 'block', margin: '50px auto' }} />;
+    return <AppLayout><Spin size="large" style={{ display: 'block', margin: '50px auto' }} /></AppLayout>;
   }
 
   return (
-    <div style={{ padding: '24px' }}>
+    <AppLayout>
+    <div style={{ padding: '0' }}>
       <Card title={id ? 'Edit Order' : 'Create New Order'}>
         <Form
           form={form}
@@ -266,6 +268,7 @@ const SalesOrderForm = () => {
         </Form>
       </Card>
     </div>
+    </AppLayout>
   );
 };
 

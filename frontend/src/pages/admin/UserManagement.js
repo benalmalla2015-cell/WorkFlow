@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
+import AppLayout from '../../components/AppLayout';
 
 const { Option } = Select;
 
@@ -221,7 +222,8 @@ const UserManagement = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <AppLayout>
+    <div style={{ padding: '0' }}>
       <Card 
         title="User Management" 
         extra={
@@ -369,6 +371,7 @@ const UserManagement = () => {
         </Form>
       </Modal>
     </div>
+    </AppLayout>
   );
 };
 

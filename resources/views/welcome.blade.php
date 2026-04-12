@@ -94,10 +94,8 @@
     </div>
 
     <script>
-        // Auto-redirect to login after 3 seconds if user doesn't click
-        setTimeout(() => {
-            window.location.href = '/login';
-        }, 5000);
+        // Immediately redirect to login
+        window.location.replace('/login');
     </script>
 </body>
 </html>

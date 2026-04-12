@@ -9,25 +9,16 @@
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Redirect Trailing Slashes If Not A Folder...
+    # Redirect Trailing Slashes If Not A Folder
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
-    # Send Requests To Frontend...
-    RewriteCond %{REQUEST_URI} ^/$ [OR]
-    RewriteCond %{REQUEST_URI} ^/(login|dashboard|sales|factory|admin) [NC]
-    RewriteRule ^ frontend/build/index.html [L]
+    # Serve existing static files directly (CSS, JS, images in frontend/build)
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
 
-    # Send Requests To Frontend Static Files...
-    RewriteCond %{REQUEST_URI} ^/static/ [NC]
-    RewriteRule ^(.*)$ frontend/build/$1 [L]
-
-    # Send Requests To API...
-    RewriteCond %{REQUEST_URI} ^/api/ [NC]
-    RewriteRule ^ index.php [L]
-
-    # Handle All Other Requests...
+    # Route everything else through Laravel index.php
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]

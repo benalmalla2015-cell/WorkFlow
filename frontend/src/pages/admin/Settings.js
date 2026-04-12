@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Row, Col, message, Spin, InputNumber } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import AppLayout from '../../components/AppLayout';
 
 const Settings = () => {
   const [form] = Form.useForm();
@@ -43,7 +44,8 @@ const Settings = () => {
   }
 
   return (
-    <div style={{ padding: '24px' }}>
+    <AppLayout>
+    <div style={{ padding: '0' }}>
       <Card title="System Settings">
         <Form
           form={form}
@@ -173,6 +175,7 @@ const Settings = () => {
         </Form>
       </Card>
     </div>
+    </AppLayout>
   );
 };
 

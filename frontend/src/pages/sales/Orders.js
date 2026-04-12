@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Card, Button, Tag, Space, message, Modal, Input, Select, DatePicker, Spin } from 'antd';
+import { Table, Card, Button, Tag, Space, message, Modal, Row, Col, Select, DatePicker } from 'antd';
 import { 
   PlusOutlined, 
   EyeOutlined, 
@@ -12,6 +12,7 @@ import {
   SearchOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
+import AppLayout from '../../components/AppLayout';
 import axios from 'axios';
 import moment from 'moment';
 
@@ -245,7 +246,8 @@ const SalesOrders = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <AppLayout>
+    <div style={{ padding: '0' }}>
       <Card 
         title="My Orders" 
         extra={
@@ -356,6 +358,7 @@ const SalesOrders = () => {
         )}
       </Modal>
     </div>
+    </AppLayout>
   );
 };
 
