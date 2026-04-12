@@ -31,27 +31,43 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const bootstrapAuth = async () => {
       const token = getStoredToken();
 
       if (!token) {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
         return;
       }
 
       try {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         const response = await axios.get('/api/me');
-        setUser(response.data);
+        const currentToken = getStoredToken();
+        if (isMounted && currentToken === token) {
+          setUser(response.data);
+        }
       } catch (error) {
-        clearAuthState();
-        setUser(null);
+        const currentToken = getStoredToken();
+        if (isMounted && currentToken === token) {
+          clearAuthState();
+          setUser(null);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     bootstrapAuth();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = async (credentials) => {
