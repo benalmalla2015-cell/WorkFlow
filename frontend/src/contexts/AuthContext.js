@@ -28,12 +28,37 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const fetchUser = async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     try {
-      const response = await axios.get('/api/me');
-      setUser(response.data);
+      // Use native fetch to avoid axios defaults/interceptor issues
+      const res = await fetch('/api/me', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data);
+        // Also set axios default for subsequent requests
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      } else {
+        // Token invalid - clear storage
+        localStorage.removeItem(TOKEN_KEY);
+        delete axios.defaults.headers.common['Authorization'];
+        setUser(null);
+      }
     } catch (error) {
-      console.error('Failed to fetch user:', error);
-      logout();
+      console.error('fetchUser error:', error);
+      localStorage.removeItem(TOKEN_KEY);
+      setUser(null);
     } finally {
       setLoading(false);
     }
