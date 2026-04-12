@@ -15,9 +15,8 @@
         "simplesoftwareio/simple-qrcode": "^4.2",
         "aws/aws-sdk-php": "^3.200",
         "league/flysystem-aws-s3-v3": "^3.0",
-        "laravel/cashier": "^14.0",
         "intervention/image": "^2.7",
-        "carbon\Carbon": "^2.66"
+        "nesbot/carbon": "^2.66"
     },
     "require-dev": {
         "fakerphp/faker": "^1.9.1",

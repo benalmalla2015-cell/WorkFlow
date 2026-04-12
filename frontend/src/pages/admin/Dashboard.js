@@ -1,335 +1,281 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Table, Tag, Button, Modal, InputNumber, message, Spin } from 'antd';
-import { 
-  UserOutlined, 
-  ShoppingCartOutlined, 
-  DollarOutlined, 
-  CheckCircleOutlined,
-  EyeOutlined
-} from '@ant-design/icons';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, Row, Col, Statistic, Table, Button, Modal, Form, InputNumber, Tag, Typography, message, Space, Tabs, Select, DatePicker, Spin } from 'antd';
+import { CheckCircleOutlined, DollarOutlined, TeamOutlined, FileTextOutlined, ReloadOutlined, EditOutlined, BarChartOutlined } from '@ant-design/icons';
+import { Line, Bar, Pie } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title as ChartTitle, Tooltip, Legend } from 'chart.js';
 import AppLayout from '../../components/AppLayout';
 import axios from 'axios';
 
-const AdminDashboard = () => {
-  const [stats, setStats] = useState({});
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, ChartTitle, Tooltip, Legend);
+
+const { Title, Text } = Typography;
+
+const statusColors = {
+  draft: 'default', factory_pricing: 'processing', manager_review: 'warning',
+  approved: 'success', customer_approved: 'cyan', payment_confirmed: 'green', completed: 'purple'
+};
+
+export default function AdminDashboard() {
+  const [stats, setStats] = useState(null);
   const [orders, setOrders] = useState([]);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [profitMarginModal, setProfitMarginModal] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [marginForm, setMarginForm] = useState({});
+  const [profitData, setProfitData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [approveModal, setApproveModal] = useState({ open: false, order: null });
+  const [approving, setApproving] = useState(false);
+  const [form] = Form.useForm();
+  const [activeTab, setActiveTab] = useState('overview');
 
-  useEffect(() => {
-    fetchDashboardStats();
-    fetchRecentOrders();
-  }, []);
-
-  const fetchDashboardStats = async () => {
+  const loadData = useCallback(async () => {
+    setLoading(true);
     try {
-      const response = await axios.get('/api/admin/dashboard/stats');
-      setStats(response.data);
-    } catch (error) {
-      message.error('Failed to fetch dashboard statistics');
-    }
-  };
-
-  const fetchRecentOrders = async () => {
-    try {
-      const response = await axios.get('/api/admin/orders?per_page=10');
-      setOrders(response.data.data);
-    } catch (error) {
-      message.error('Failed to fetch recent orders');
-    }
-  };
-
-  const approveOrder = async (order) => {
-    setSelectedOrder(order);
-    setMarginForm({ profit_margin_percentage: order.profit_margin_percentage || 20 });
-    setProfitMarginModal(true);
-  };
-
-  const handleApproveOrder = async () => {
-    try {
-      setLoading(true);
-      await axios.post(`/api/orders/${selectedOrder.id}/approve`, marginForm);
-      message.success('Order approved successfully');
-      setProfitMarginModal(false);
-      setSelectedOrder(null);
-      fetchDashboardStats();
-      fetchRecentOrders();
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Failed to approve order');
+      const [statsRes, ordersRes, profitRes] = await Promise.all([
+        axios.get('/api/admin/dashboard/stats'),
+        axios.get('/api/admin/orders'),
+        axios.get('/api/admin/profit-analysis'),
+      ]);
+      setStats(statsRes.data);
+      setOrders(ordersRes.data?.data || ordersRes.data || []);
+      setProfitData(profitRes.data);
+    } catch (e) {
+      message.error('Failed to load dashboard');
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const openApprove = (order) => {
+    const defaultMargin = stats?.default_profit_margin || 20;
+    const suggestedPrice = order.factory_cost ? (parseFloat(order.factory_cost) * (1 + defaultMargin / 100)).toFixed(2) : 0;
+    form.setFieldsValue({
+      profit_margin_percentage: defaultMargin,
+      suggested_price: suggestedPrice,
+    });
+    setApproveModal({ open: true, order });
   };
 
-  const viewOrder = (order) => {
-    setSelectedOrder(order);
-    setModalVisible(true);
+  const handleApprove = async (values) => {
+    setApproving(true);
+    try {
+      await axios.post(`/api/orders/${approveModal.order.id}/approve`, {
+        profit_margin_percentage: values.profit_margin_percentage,
+      });
+      message.success(`Order #${approveModal.order.order_number} approved with ${values.profit_margin_percentage}% margin`);
+      setApproveModal({ open: false, order: null });
+      loadData();
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Approval failed');
+    } finally {
+      setApproving(false);
+    }
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      draft: 'default',
-      factory_pricing: 'processing',
-      manager_review: 'warning',
-      approved: 'success',
-      customer_approved: 'blue',
-      payment_confirmed: 'green',
-      completed: 'purple',
-    };
-    return colors[status] || 'default';
-  };
+  const pendingOrders = orders.filter(o => o.status === 'manager_review');
 
-  const getStatusText = (status) => {
-    return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
-
-  const orderColumns = [
+  const columns = [
+    { title: 'Order #', dataIndex: 'order_number', key: 'order_number', width: 130 },
     {
-      title: 'Order Number',
-      dataIndex: 'order_number',
-      key: 'order_number',
+      title: 'Customer', key: 'customer', width: 140,
+      render: (_, r) => r.customer?.full_name || '—'
+    },
+    { title: 'Product', dataIndex: 'product_name', key: 'product_name', ellipsis: true },
+    { title: 'Qty', dataIndex: 'quantity', key: 'quantity', width: 70 },
+    {
+      title: 'Factory Cost', key: 'factory_cost', width: 120,
+      render: (_, r) => r.factory_cost ? `$${parseFloat(r.factory_cost).toFixed(2)}` : '—'
     },
     {
-      title: 'Customer',
-      dataIndex: ['customer', 'full_name'],
-      key: 'customer',
+      title: 'Final Price', key: 'final_price', width: 120,
+      render: (_, r) => r.final_price ? <Text type="success">${parseFloat(r.final_price).toFixed(2)}</Text> : '—'
     },
     {
-      title: 'Sales Person',
-      dataIndex: ['salesUser', 'name'],
-      key: 'salesUser',
+      title: 'Margin', key: 'margin', width: 80,
+      render: (_, r) => r.profit_margin_percentage ? <Tag color="blue">{r.profit_margin_percentage}%</Tag> : '—'
     },
     {
-      title: 'Amount',
-      dataIndex: 'final_price',
-      key: 'final_price',
-      render: (price) => price ? `$${Number(price).toFixed(2)}` : '-',
+      title: 'Status', dataIndex: 'status', key: 'status', width: 130,
+      render: s => <Tag color={statusColors[s]}>{s?.replace(/_/g, ' ')}</Tag>
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => (
-        <Tag color={getStatusColor(status)}>
-          {getStatusText(status)}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_, record) => (
-        <Button.Group>
-          <Button 
-            size="small" 
-            icon={<EyeOutlined />} 
-            onClick={() => viewOrder(record)}
-          >
-            View
-          </Button>
-          {record.status === 'manager_review' && (
-            <Button 
-              size="small" 
-              type="primary" 
-              onClick={() => approveOrder(record)}
-            >
-              Approve
-            </Button>
-          )}
-        </Button.Group>
-      ),
+      title: 'Actions', key: 'actions', width: 100,
+      render: (_, r) => r.status === 'manager_review' ? (
+        <Button type="primary" size="small" icon={<CheckCircleOutlined />} onClick={() => openApprove(r)}>
+          Approve
+        </Button>
+      ) : null
     },
   ];
 
+  const chartColors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#f9ca24'];
+
+  const profitChartData = profitData ? {
+    labels: profitData.monthly_labels || [],
+    datasets: [{
+      label: 'Monthly Profit (USD)',
+      data: profitData.monthly_profit || [],
+      borderColor: '#667eea',
+      backgroundColor: 'rgba(102,126,234,0.1)',
+      tension: 0.4,
+      fill: true,
+    }]
+  } : null;
+
+  const statusChartData = stats ? {
+    labels: Object.keys(stats.orders_by_status || {}),
+    datasets: [{
+      data: Object.values(stats.orders_by_status || {}),
+      backgroundColor: chartColors,
+    }]
+  } : null;
+
+  if (loading) return <AppLayout><Spin size="large" style={{ display: 'block', margin: '80px auto' }} /></AppLayout>;
+
   return (
     <AppLayout>
-    <div style={{ padding: '0' }}>
-      <h2>Admin Dashboard</h2>
-      
-      {/* Statistics Cards */}
-      <Row gutter={16} style={{ marginBottom: '24px' }}>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="Total Orders"
-              value={stats.total_orders || 0}
-              prefix={<ShoppingCartOutlined />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="Total Revenue"
-              value={stats.total_revenue || 0}
-              prefix={<DollarOutlined />}
-              precision={2}
-              valueStyle={{ color: '#52c41a' }}
-              formatter={(value) => `$${Number(value).toLocaleString()}`}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="Pending Orders"
-              value={stats.pending_orders || 0}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#faad14' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="Active Users"
-              value={stats.active_users || 0}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: '#722ed1' }}
-            />
-          </Card>
-        </Col>
-      </Row>
+      <div style={{ padding: '24px' }}>
+        <Row align="middle" justify="space-between" style={{ marginBottom: 24 }}>
+          <Col><Title level={3} style={{ margin: 0 }}>📊 Admin Dashboard</Title></Col>
+          <Col>
+            <Button icon={<ReloadOutlined />} onClick={loadData}>Refresh</Button>
+          </Col>
+        </Row>
 
-      {/* Charts */}
-      <Row gutter={16} style={{ marginBottom: '24px' }}>
-        <Col span={16}>
-          <Card title="Monthly Revenue Trend">
-            {stats.monthly_stats && (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={stats.monthly_stats}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="revenue" stroke="#1890ff" name="Revenue" />
-                  <Line type="monotone" dataKey="orders" stroke="#52c41a" name="Orders" />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </Card>
-        </Col>
-        <Col span={8}>
-          <Card title="Orders by Status">
-            {stats.orders_by_status && (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={Object.entries(stats.orders_by_status).map(([key, value]) => ({
-                      name: getStatusText(key),
-                      value
-                    }))}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {Object.entries(stats.orders_by_status).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </Card>
-        </Col>
-      </Row>
+        {/* Stats Cards */}
+        <Row gutter={16} style={{ marginBottom: 24 }}>
+          <Col xs={12} sm={6}>
+            <Card><Statistic title="Total Orders" value={stats?.total_orders || 0} prefix={<FileTextOutlined />} /></Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card><Statistic title="Pending Approval" value={pendingOrders.length} prefix={<EditOutlined />} valueStyle={{ color: '#faad14' }} /></Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card><Statistic title="Total Revenue" value={stats?.total_revenue || 0} prefix="$" precision={2} valueStyle={{ color: '#52c41a' }} /></Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card><Statistic title="Total Users" value={stats?.total_users || 0} prefix={<TeamOutlined />} /></Card>
+          </Col>
+        </Row>
 
-      {/* Recent Orders */}
-      <Card title="Recent Orders">
-        <Table
-          columns={orderColumns}
-          dataSource={orders}
-          rowKey="id"
-          pagination={false}
-        />
-      </Card>
-
-      {/* Order Details Modal */}
-      <Modal
-        title="Order Details"
-        visible={modalVisible}
-        onCancel={() => setModalVisible(false)}
-        footer={null}
-        width={800}
-      >
-        {selectedOrder && (
-          <div>
-            <Row gutter={16}>
-              <Col span={12}>
-                <p><strong>Order Number:</strong> {selectedOrder.order_number}</p>
-                <p><strong>Customer:</strong> {selectedOrder.customer?.full_name}</p>
-                <p><strong>Phone:</strong> {selectedOrder.customer?.phone}</p>
-                <p><strong>Sales Person:</strong> {selectedOrder.salesUser?.name}</p>
-              </Col>
-              <Col span={12}>
-                <p><strong>Product:</strong> {selectedOrder.product_name}</p>
-                <p><strong>Quantity:</strong> {selectedOrder.quantity}</p>
-                <p><strong>Factory Cost:</strong> ${selectedOrder.factory_cost || 'N/A'}</p>
-                <p><strong>Final Price:</strong> ${selectedOrder.final_price || 'N/A'}</p>
-              </Col>
-            </Row>
-            {selectedOrder.specifications && (
-              <div style={{ marginTop: '16px' }}>
-                <strong>Specifications:</strong>
-                <p>{selectedOrder.specifications}</p>
-              </div>
-            )}
-          </div>
+        {/* Pending Approvals Alert */}
+        {pendingOrders.length > 0 && (
+          <Card
+            title={<><EditOutlined /> Orders Pending Your Approval ({pendingOrders.length})</>}
+            style={{ marginBottom: 24, border: '2px solid #faad14' }}
+            headStyle={{ background: '#fffbe6' }}
+          >
+            <Table
+              dataSource={pendingOrders}
+              columns={columns.filter(c => ['order_number','customer','product_name','quantity','factory_cost','actions'].includes(c.key))}
+              rowKey="id"
+              pagination={false}
+              size="small"
+            />
+          </Card>
         )}
-      </Modal>
 
-      {/* Profit Margin Modal */}
-      <Modal
-        title="Approve Order - Set Profit Margin"
-        visible={profitMarginModal}
-        onOk={handleApproveOrder}
-        onCancel={() => setProfitMarginModal(false)}
-        confirmLoading={loading}
-      >
-        {selectedOrder && (
-          <div>
-            <p><strong>Order:</strong> {selectedOrder.order_number}</p>
-            <p><strong>Product:</strong> {selectedOrder.product_name}</p>
-            <p><strong>Factory Cost:</strong> ${selectedOrder.factory_cost}</p>
-            <p><strong>Default Margin:</strong> 20%</p>
-            
-            <div style={{ marginTop: '16px' }}>
-              <label><strong>Profit Margin (%):</strong></label>
-              <InputNumber
-                min={0}
-                max={100}
-                step={0.1}
-                precision={1}
-                value={marginForm.profit_margin_percentage}
-                onChange={(value) => setMarginForm({ ...marginForm, profit_margin_percentage: value })}
-                style={{ width: '100%', marginTop: '8px' }}
+        <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
+          {
+            key: 'overview',
+            label: '📋 All Orders',
+            children: (
+              <Table
+                dataSource={orders}
+                columns={columns}
+                rowKey="id"
+                pagination={{ pageSize: 15 }}
+                scroll={{ x: 900 }}
+                size="small"
               />
-            </div>
-            
-            <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f0f0f0', borderRadius: '4px' }}>
-              <p><strong>Calculated Final Price:</strong> ${(selectedOrder.factory_cost * (1 + (marginForm.profit_margin_percentage || 20) / 100)).toFixed(2)}</p>
-              <p><strong>Profit Amount:</strong> ${(selectedOrder.factory_cost * ((marginForm.profit_margin_percentage || 20) / 100)).toFixed(2)}</p>
-            </div>
-          </div>
+            )
+          },
+          {
+            key: 'charts',
+            label: '📈 Analytics',
+            children: (
+              <Row gutter={16}>
+                <Col span={16}>
+                  <Card title="Monthly Profit Trend">
+                    {profitChartData ? (
+                      <Line data={profitChartData} options={{ responsive: true, plugins: { legend: { position: 'top' } } }} />
+                    ) : <Text type="secondary">No profit data yet</Text>}
+                  </Card>
+                </Col>
+                <Col span={8}>
+                  <Card title="Orders by Status">
+                    {statusChartData ? (
+                      <Pie data={statusChartData} options={{ responsive: true }} />
+                    ) : <Text type="secondary">No status data</Text>}
+                  </Card>
+                </Col>
+                {profitData?.employee_performance && (
+                  <Col span={24} style={{ marginTop: 16 }}>
+                    <Card title="Employee Performance">
+                      <Bar
+                        data={{
+                          labels: profitData.employee_performance.map(e => e.name),
+                          datasets: [{
+                            label: 'Orders Count',
+                            data: profitData.employee_performance.map(e => e.orders_count),
+                            backgroundColor: '#667eea',
+                          }]
+                        }}
+                        options={{ responsive: true }}
+                      />
+                    </Card>
+                  </Col>
+                )}
+              </Row>
+            )
+          }
+        ]} />
+      </div>
+
+      {/* Approval Modal */}
+      <Modal
+        title={`✅ Approve Order #${approveModal.order?.order_number}`}
+        open={approveModal.open}
+        onCancel={() => setApproveModal({ open: false, order: null })}
+        footer={null}
+        width={480}
+      >
+        {approveModal.order && (
+          <>
+            <Card size="small" style={{ marginBottom: 16, background: '#f9f9f9' }}>
+              <Row gutter={8}>
+                <Col span={12}><Text type="secondary">Product:</Text><br /><Text strong>{approveModal.order.product_name}</Text></Col>
+                <Col span={12}><Text type="secondary">Factory Cost:</Text><br /><Text strong style={{ color: '#cf1322' }}>${parseFloat(approveModal.order.factory_cost || 0).toFixed(2)}</Text></Col>
+              </Row>
+            </Card>
+            <Form form={form} layout="vertical" onFinish={handleApprove}>
+              <Form.Item name="profit_margin_percentage" label="Profit Margin (%)" rules={[{ required: true }]}
+                help="Adjust margin before final approval">
+                <InputNumber
+                  min={0} max={500} step={1} style={{ width: '100%' }}
+                  formatter={v => `${v}%`} parser={v => v.replace('%', '')}
+                  onChange={v => {
+                    const cost = parseFloat(approveModal.order.factory_cost || 0);
+                    form.setFieldValue('suggested_price', (cost * (1 + v / 100)).toFixed(2));
+                  }}
+                />
+              </Form.Item>
+              <Form.Item name="suggested_price" label="Resulting Sale Price (USD)">
+                <InputNumber disabled style={{ width: '100%' }} formatter={v => `$ ${v}`} />
+              </Form.Item>
+              <Row gutter={8}>
+                <Col span={12}>
+                  <Button block onClick={() => setApproveModal({ open: false, order: null })}>Cancel</Button>
+                </Col>
+                <Col span={12}>
+                  <Button type="primary" htmlType="submit" block loading={approving} icon={<CheckCircleOutlined />}>
+                    Approve Order
+                  </Button>
+                </Col>
+              </Row>
+            </Form>
+          </>
         )}
       </Modal>
-    </div>
     </AppLayout>
   );
-};
-
-export default AdminDashboard;
+}

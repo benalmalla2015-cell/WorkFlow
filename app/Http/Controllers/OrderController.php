@@ -304,7 +304,8 @@ class OrderController extends Controller
     {
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                $path = $file->store($type === 'sales_upload' ? 'sales_uploads' : 'factory_uploads', 's3');
+                $folder = $type === 'sales_upload' ? 'sales_uploads' : 'factory_uploads';
+                $path = $file->store($folder, 'public');
 
                 Attachment::create([
                     'order_id' => $order->id,

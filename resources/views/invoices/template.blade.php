@@ -1,191 +1,208 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>Invoice - {{ $invoice_number }}</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        .header {
-            text-align: center;
-            border-bottom: 2px solid #333;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
-        }
-        .company-info {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
-        }
-        .invoice-details {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
-        }
-        .invoice-info, .customer-info {
-            width: 48%;
-        }
-        .invoice-info h3, .customer-info h3 {
-            margin: 0 0 10px 0;
-            color: #333;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 5px;
-        }
-        .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 30px;
-        }
-        .items-table th {
-            background-color: #f8f9fa;
-            padding: 12px;
-            text-align: left;
-            border-bottom: 2px solid #333;
-        }
-        .items-table td {
-            padding: 12px;
-            border-bottom: 1px solid #ddd;
-        }
-        .items-table .total-row {
-            font-weight: bold;
-            background-color: #f8f9fa;
-        }
-        .bank-details {
-            margin-top: 30px;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-        }
-        .bank-details h3 {
-            margin: 0 0 15px 0;
-            color: #333;
-        }
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-            text-align: center;
-            font-style: italic;
-            color: #666;
-        }
-        .qr-code {
-            text-align: center;
-            margin-top: 20px;
-        }
-        .qr-code img {
-            max-width: 150px;
-            height: auto;
-        }
-    </style>
+<meta charset="utf-8">
+<title>Invoice {{ $invoice_number }}</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: Arial, sans-serif; font-size: 9pt; color:#000; padding:15mm 12mm; }
+.page { width:100%; }
+
+/* Header */
+.header-logo { text-align:right; margin-bottom:2px; }
+.header-logo .brand { font-size:22pt; font-weight:bold; color:#1a5276; }
+.header-logo .brand sup { font-size:10pt; }
+.header-logo .tagline { font-size:8pt; color:#555; }
+.header-addr { text-align:right; font-size:7.5pt; color:#333; margin-bottom:8px; }
+
+/* TO line */
+.to-line { margin:8px 0 4px 0; }
+.to-line span { font-size:11pt; font-weight:bold; text-decoration:underline; }
+
+/* Right-side invoice info */
+.inv-info-table { width:100%; margin:6px 0; }
+.inv-info-table td { font-size:8.5pt; padding:1px 0; }
+.inv-info-table .label { font-weight:bold; }
+
+/* Horizontal rule */
+hr.thick { border:none; border-top:2px solid #000; margin:6px 0; }
+hr.thin  { border:none; border-top:1px solid #aaa; margin:4px 0; }
+
+/* INVOICE title */
+.inv-title { text-align:center; font-size:16pt; font-weight:bold; letter-spacing:2px; margin:10px 0; }
+
+/* Project line */
+.project-line { font-size:8.5pt; margin:4px 0 10px 0; border-bottom:1px dashed #888; padding-bottom:4px; }
+
+/* Items table */
+table.items { width:100%; border-collapse:collapse; font-size:8.5pt; }
+table.items th {
+    background:#d5e8d4; border:1px solid #888; padding:5px 4px;
+    text-align:left; font-size:8pt;
+}
+table.items td { border:1px solid #bbb; padding:5px 4px; vertical-align:top; }
+table.items .amount { text-align:right; }
+table.items .total-row td { background:#f5f5f5; font-weight:bold; }
+table.items .grand-total td { background:#d5e8d4; font-weight:bold; font-size:9.5pt; }
+
+/* Payment section */
+.payment-title { font-size:9.5pt; font-weight:bold; text-decoration:underline; margin:10px 0 5px 0; }
+table.bank { width:100%; border-collapse:collapse; font-size:8.5pt; margin-bottom:8px; }
+table.bank td { border:1px solid #888; padding:4px 6px; }
+table.bank .bank-label { background:#d5e8d4; font-weight:bold; width:38%; }
+
+/* Footer */
+.remark { font-size:7.5pt; color:#333; margin-top:6px; border-top:1px solid #ccc; padding-top:4px; }
+.sales-footer { margin-top:10px; font-size:8.5pt; }
+.qr-wrap { margin-top:10px; text-align:center; }
+.qr-wrap img { width:90px; height:90px; }
+.qr-wrap small { display:block; font-size:7pt; color:#555; }
+</style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="company-info">{{ $company['name'] }}</div>
-            <div>SALES INVOICE</div>
-        </div>
+<div class="page">
 
-        <!-- Invoice and Customer Details -->
-        <div class="invoice-details">
-            <div class="invoice-info">
-                <h3>Invoice Details</h3>
-                <p><strong>Invoice Number:</strong> {{ $invoice_number }}</p>
-                <p><strong>Invoice Date:</strong> {{ $invoice_date }}</p>
-                <p><strong>Page:</strong> 1</p>
-            </div>
-            <div class="customer-info">
-                <h3>Customer Information</h3>
-                <p><strong>Name:</strong> {{ $customer->full_name }}</p>
-                <p><strong>Address:</strong> {{ $customer->address }}</p>
-                <p><strong>Phone:</strong> {{ $customer->phone }}</p>
-                @if($customer->email)
-                <p><strong>Email:</strong> {{ $customer->email }}</p>
-                @endif
-            </div>
-        </div>
+  {{-- ===== HEADER ===== --}}
+  <table width="100%"><tr>
+    <td valign="top" width="60%"></td>
+    <td valign="top" width="40%" style="text-align:right;">
+      <div class="brand">DAYANCO<sup>®</sup></div>
+      <div style="font-size:8pt;color:#555;">| Supply Chain Management |</div>
+    </td>
+  </tr></table>
 
-        <!-- Items Table -->
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th>Project Name</th>
-                    <th>Item Name</th>
-                    <th>Description</th>
-                    <th>Quantity</th>
-                    <th>Unit Price (USD)</th>
-                    <th>Amount (USD)</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($items as $item)
-                <tr>
-                    <td>{{ $order->order_number }}</td>
-                    <td>{{ $item['name'] }}</td>
-                    <td>{{ $item['description'] }}</td>
-                    <td>{{ $item['quantity'] }}</td>
-                    <td>${{ number_format($item['unit_price'], 2) }}</td>
-                    <td>${{ number_format($item['total'], 2) }}</td>
-                </tr>
-                @endforeach
-                <tr class="total-row">
-                    <td colspan="5"><strong>Sub-total</strong></td>
-                    <td><strong>${{ number_format($subtotal, 2) }}</strong></td>
-                </tr>
-                <tr class="total-row">
-                    <td colspan="5"><strong>Balance</strong></td>
-                    <td><strong>${{ number_format($subtotal, 2) }}</strong></td>
-                </tr>
-                <tr class="total-row">
-                    <td colspan="5"><strong>Bank Fee</strong></td>
-                    <td>$0.00</td>
-                </tr>
-                <tr class="total-row">
-                    <td colspan="5"><strong>Local Bank Charge of IMT</strong></td>
-                    <td>$0.00</td>
-                </tr>
-                <tr class="total-row" style="background-color: #e8f5e8; font-size: 16px;">
-                    <td colspan="5"><strong>Total Amount due</strong></td>
-                    <td><strong>${{ number_format($subtotal, 2) }}</strong></td>
-                </tr>
-            </tbody>
-        </table>
+  <hr class="thick">
 
-        <!-- Payment Details -->
-        <div class="bank-details">
-            <h3>Payment Method</h3>
-            <p><strong>Beneficiary Name:</strong> {{ $bank_details['beneficiary_name'] }}</p>
-            <p><strong>Beneficiary Bank:</strong> {{ $bank_details['beneficiary_bank'] }}</p>
-            <p><strong>Beneficiary Account Numbers:</strong> {{ $bank_details['account_number'] }}</p>
-            <p><strong>Beneficiary Address:</strong> {{ $company['address'] }}</p>
-            <p><strong>Bank Address:</strong> {{ $bank_details['bank_address'] }}</p>
-            <p><strong>SWIFT:</strong> {{ $bank_details['swift_code'] }}</p>
-            <p><strong>Country:</strong> China</p>
-            <p><strong>Purpose of Payments:</strong> Payment for Invoice {{ $invoice_number }}</p>
-        </div>
+  {{-- TO line --}}
+  <div class="to-line">
+    <span>TO Mr. {{ optional($customer)->full_name ?? '?' }} &ndash; Purchasing Manager</span>
+  </div>
+  <hr class="thin">
 
-        <!-- QR Code -->
-        <div class="qr-code">
-            <img src="{{ $qr_code_url }}" alt="QR Code for Verification">
-            <p><small>Scan QR code to verify invoice details</small></p>
-        </div>
+  {{-- Invoice details right-aligned --}}
+  <table class="inv-info-table">
+    <tr>
+      <td></td>
+      <td style="text-align:right;">
+        <span class="label">Invoice Number:</span> {{ $invoice_number }}<br>
+        <span class="label">Invoice Date:</span> {{ $invoice_date }}<br>
+        <span class="label">Page:</span> 1/page
+      </td>
+    </tr>
+  </table>
 
-        <!-- Footer -->
-        <div class="footer">
-            <p><strong>REMARK:</strong> PLEASE USE THE FULL BENEFICIARY NAME ABOVE WHEN REMITTING, THANK YOU.</p>
-            <p>Sales Representative: {{ $sales_user->name }} | Generated on: {{ now()->format('Y-m-d H:i:s') }}</p>
+  <div class="inv-title">INVOICE</div>
+  <hr class="thick">
+
+  <div class="project-line">
+    <strong>Project Name / ITEM NAME:</strong> {{ $order->product_name }}
+  </div>
+
+  {{-- Items Table --}}
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:12%">Date</th>
+        <th style="width:18%">Item</th>
+        <th>Description</th>
+        <th style="width:18%;text-align:right;">Amount (USD)</th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach($items as $item)
+      <tr>
+        <td>{{ now()->format('M j\s\t') }}</td>
+        <td>{{ $item['name'] }}</td>
+        <td>
+          100% for {{ $item['quantity'] }}pcs / EXW SAUDI<br>
+          – Refer to the quotation number of {{ $invoice_number }}<br>
+          – Total styles: 1 dozens | {{ $item['quantity'] }} pcs<br>
+          – Production Lead Time: around {{ now()->addDays(30)->format('F Y') }}
+        </td>
+        <td class="amount">{{ number_format($item['total'], 2) }}</td>
+      </tr>
+      @endforeach
+
+      <tr class="total-row">
+        <td colspan="3" style="text-align:right;">Sub-total Above USD</td>
+        <td class="amount">{{ number_format($subtotal, 2) }}</td>
+      </tr>
+      <tr class="total-row">
+        <td colspan="3" style="text-align:right;">70% Balance USD</td>
+        <td class="amount">{{ number_format($subtotal * 0.7, 2) }}</td>
+      </tr>
+      <tr>
+        <td>{{ now()->format('M j\s\t') }}</td>
+        <td>Bank Fee</td>
+        <td>Local Bank Charge of IMT</td>
+        <td class="amount">40.00</td>
+      </tr>
+      <tr class="grand-total">
+        <td colspan="3" style="text-align:right;font-size:10pt;">Total Amount due to This Invoice:</td>
+        <td class="amount" style="font-size:10pt;">USD&nbsp;{{ number_format($subtotal, 2) }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  {{-- Payment Section --}}
+  <div class="payment-title">Payment Method &lpar; For USD remittance &rpar;</div>
+  <table class="bank">
+    <tr>
+      <td class="bank-label">Beneficiary Name</td>
+      <td>{{ $bank_details['beneficiary_name'] }}</td>
+    </tr>
+    <tr>
+      <td class="bank-label">Beneficiary Bank</td>
+      <td>{{ $bank_details['beneficiary_bank'] }}</td>
+    </tr>
+    <tr>
+      <td class="bank-label">Beneficiary Account Numbers</td>
+      <td>{{ $bank_details['account_number'] }}</td>
+    </tr>
+    <tr>
+      <td class="bank-label">Beneficiary Address</td>
+      <td>{{ $bank_details['beneficiary_address'] }}</td>
+    </tr>
+    <tr>
+      <td class="bank-label">Bank Address</td>
+      <td>{{ $bank_details['bank_address'] }}</td>
+    </tr>
+    <tr>
+      <td class="bank-label">SWIFT</td>
+      <td>{{ $bank_details['swift_code'] }}</td>
+    </tr>
+    <tr>
+      <td class="bank-label">COUNTRY</td>
+      <td>{{ $bank_details['country'] }}</td>
+    </tr>
+    <tr>
+      <td class="bank-label">PURPOSE OF PAYMENTS</td>
+      <td>{{ $bank_details['purpose'] }}</td>
+    </tr>
+  </table>
+
+  <div class="remark">
+    <strong>REMARK:</strong> PLEASE USE THE FULL BENEFICIARY NAME ABOVE WHEN REMITTING, THANK YOU.
+  </div>
+
+  {{-- Footer: Sales person + QR --}}
+  <table width="100%" style="margin-top:12px;">
+    <tr>
+      <td valign="bottom">
+        <div class="sales-footer">
+          <strong>Sales Representative:</strong> {{ optional($sales_user)->name }}<br>
+          <small>Generated: {{ now()->format('Y-m-d H:i') }}</small>
         </div>
-    </div>
+      </td>
+      <td width="100" valign="top" style="text-align:center;">
+        @if(!empty($qr_code_base64))
+          <img src="{{ $qr_code_base64 }}" style="width:80px;height:80px;"><br>
+          <small style="font-size:7pt;">Scan to verify</small>
+        @endif
+      </td>
+    </tr>
+  </table>
+
+</div>
 </body>
 </html>

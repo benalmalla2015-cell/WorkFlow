@@ -49,8 +49,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders/{order}/invoice', [DocumentController::class, 'generateInvoice']);
     Route::get('/orders/{order}/download-quotation', [DocumentController::class, 'downloadQuotation']);
     Route::get('/orders/{order}/download-invoice', [DocumentController::class, 'downloadInvoice']);
-    Route::get('/orders/verify/{orderNumber}', [DocumentController::class, 'verifyOrder']);
+    Route::get('/attachments/{attachment}/download', [DocumentController::class, 'downloadAttachment']);
 });
+Route::get('/orders/verify/{orderNumber}', [DocumentController::class, 'verifyOrder']);
 
 // Admin Routes
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
@@ -75,17 +76,18 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
 // File Upload Routes
 Route::middleware('auth:sanctum')->post('/upload', function (Request $request) {
     $request->validate([
-        'file' => 'required|file|max:10240', // 10MB max
+        'file' => 'required|file|max:10240',
         'type' => 'required|in:sales_upload,factory_upload',
     ]);
 
     if ($request->hasFile('file')) {
-        $path = $request->file('file')->store($request->type, 's3');
-        
+        $folder = $request->type === 'sales_upload' ? 'sales_uploads' : 'factory_uploads';
+        $path = $request->file('file')->store($folder, 'public');
+
         return response()->json([
             'message' => 'File uploaded successfully',
             'path' => $path,
-            'url' => Storage::disk('s3')->url($path)
+            'url'  => '/api/attachments/' . basename($path) . '/download',
         ]);
     }
 

@@ -21,23 +21,21 @@ class DocumentController extends Controller
         }
 
         try {
-            $filename = 'quotation_' . $order->order_number . '_' . date('Y-m-d') . '.xlsx';
-            
+            $filename = 'quotation_' . $order->order_number . '_' . date('Ymd') . '.xlsx';
+            $dir = storage_path('app/public/quotations');
+            if (!is_dir($dir)) mkdir($dir, 0775, true);
+            $fullPath = $dir . '/' . $filename;
+
             $export = new QuotationExport($order);
-            $filePath = 'quotations/' . $filename;
-            
-            // Store to S3
-            Excel::store($export, $filePath, 's3');
-            
-            // Update order with quotation path
-            $order->update(['quotation_path' => $filePath]);
-            
+            Excel::store($export, 'public/quotations/' . $filename);
+
+            $order->update(['quotation_path' => 'quotations/' . $filename]);
             AuditLog::log('quotation_generated', $order);
 
             return response()->json([
                 'message' => 'Quotation generated successfully',
-                'download_url' => Storage::disk('s3')->url($filePath),
-                'filename' => $filename
+                'filename' => $filename,
+                'download_url' => '/api/orders/' . $order->id . '/download-quotation'
             ]);
 
         } catch (\Exception $e) {
@@ -52,35 +50,28 @@ class DocumentController extends Controller
         }
 
         try {
-            // Generate QR code
-            $qrCodeData = $this->generateQRCodeData($order);
-            $qrCodePath = 'qrcodes/invoice_' . $order->order_number . '.png';
-            
-            $qrCode = QrCode::format('png')->size(150)->generate($qrCodeData);
-            Storage::disk('s3')->put($qrCodePath, $qrCode);
+            // Generate QR code as base64 PNG
+            $qrData = url('/api/orders/verify/' . $order->order_number);
+            $qrPng  = QrCode::format('png')->size(120)->margin(1)->generate($qrData);
+            $qrBase64 = 'data:image/png;base64,' . base64_encode($qrPng);
 
-            // Prepare invoice data
-            $invoiceData = $this->prepareInvoiceData($order, $qrCodePath);
+            $invoiceData = $this->prepareInvoiceData($order, $qrBase64);
 
-            // Generate PDF
-            $pdf = PDF::loadView('invoices.template', $invoiceData);
+            $pdf = Pdf::loadView('invoices.template', $invoiceData);
             $pdf->setPaper('a4', 'portrait');
 
-            $filename = 'invoice_' . $order->order_number . '_' . date('Y-m-d') . '.pdf';
-            $filePath = 'invoices/' . $filename;
-            
-            // Store to S3
-            Storage::disk('s3')->put($filePath, $pdf->output());
+            $filename = 'invoice_' . $order->order_number . '_' . date('Ymd') . '.pdf';
+            $dir = storage_path('app/public/invoices');
+            if (!is_dir($dir)) mkdir($dir, 0775, true);
+            Storage::disk('public')->put('invoices/' . $filename, $pdf->output());
 
-            // Update order with invoice path
-            $order->update(['invoice_path' => $filePath]);
-
+            $order->update(['invoice_path' => 'invoices/' . $filename]);
             AuditLog::log('invoice_generated', $order);
 
             return response()->json([
                 'message' => 'Invoice generated successfully',
-                'download_url' => Storage::disk('s3')->url($filePath),
-                'filename' => $filename
+                'filename' => $filename,
+                'download_url' => '/api/orders/' . $order->id . '/download-invoice'
             ]);
 
         } catch (\Exception $e) {
@@ -93,10 +84,11 @@ class DocumentController extends Controller
         if (!$order->quotation_path) {
             return response()->json(['message' => 'Quotation not generated yet'], 404);
         }
-
-        $url = Storage::disk('s3')->temporaryUrl($order->quotation_path, now()->addHours(1));
-
-        return response()->json(['download_url' => $url]);
+        $path = storage_path('app/public/' . $order->quotation_path);
+        if (!file_exists($path)) {
+            return response()->json(['message' => 'File not found'], 404);
+        }
+        return response()->download($path);
     }
 
     public function downloadInvoice(Order $order)
@@ -104,80 +96,78 @@ class DocumentController extends Controller
         if (!$order->invoice_path) {
             return response()->json(['message' => 'Invoice not generated yet'], 404);
         }
-
-        $url = Storage::disk('s3')->temporaryUrl($order->invoice_path, now()->addHours(1));
-
-        return response()->json(['download_url' => $url]);
+        $path = storage_path('app/public/' . $order->invoice_path);
+        if (!file_exists($path)) {
+            return response()->json(['message' => 'File not found'], 404);
+        }
+        return response()->download($path);
     }
 
-    private function generateQRCodeData($order)
+    public function downloadAttachment(\App\Models\Attachment $attachment)
     {
-        $data = [
-            'order_number' => $order->order_number,
-            'customer' => $order->customer->full_name,
-            'product' => $order->product_name,
-            'quantity' => $order->quantity,
-            'total_amount' => $order->final_price,
-            'sales_person' => $order->salesUser->name,
-            'date' => $order->created_at->format('Y-m-d'),
-            'verification_url' => route('orders.verify', $order->order_number)
-        ];
-
-        return json_encode($data);
+        $path = storage_path('app/public/' . $attachment->path);
+        if (!file_exists($path)) {
+            return response()->json(['message' => 'File not found'], 404);
+        }
+        return response()->download($path, $attachment->original_name);
     }
 
-    private function prepareInvoiceData($order, $qrCodePath)
+    private function prepareInvoiceData($order, $qrBase64)
     {
+        $qty  = max(1, (int)$order->quantity);
+        $total = (float)($order->final_price ?? 0);
+        $unit  = $qty > 0 ? $total / $qty : 0;
+
         return [
-            'order' => $order,
-            'customer' => $order->customer,
-            'sales_user' => $order->salesUser,
-            'company' => [
-                'name' => Setting::get('company_name', 'DAYANCO'),
-                'address' => Setting::get('company_address', 'Company Address'),
-                'phone' => Setting::get('company_phone', '+1234567890'),
+            'order'          => $order,
+            'customer'       => $order->customer,
+            'sales_user'     => $order->salesUser,
+            'company'        => [
+                'name'    => Setting::get('company_name',    'DAYANCO TRADING CO., LIMITED'),
+                'address' => Setting::get('company_address', 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU 511455, P.R. CHINA'),
+                'phone'   => Setting::get('company_phone',   '+86 188188 45411'),
+                'email'   => Setting::get('company_email',   'team@dayancofficial.com'),
+                'attn'    => Setting::get('company_attn',    'Mr. Abdulmalek'),
             ],
-            'qr_code_url' => Storage::disk('s3')->url($qrCodePath),
+            'qr_code_base64' => $qrBase64,
             'invoice_number' => 'INV-' . $order->order_number,
-            'invoice_date' => now()->format('Y-m-d'),
-            'items' => [
-                [
-                    'name' => $order->product_name,
-                    'description' => $order->specifications,
-                    'quantity' => $order->quantity,
-                    'unit_price' => $order->final_price / $order->quantity,
-                    'total' => $order->final_price
-                ]
-            ],
-            'subtotal' => $order->final_price,
+            'invoice_date'   => now()->format('F j\s\t, Y'),
+            'items'          => [[
+                'name'        => $order->product_name,
+                'description' => $order->specifications ?? '',
+                'quantity'    => $qty,
+                'unit_price'  => $unit,
+                'total'       => $total,
+            ]],
+            'subtotal' => $total,
             'bank_details' => [
-                'beneficiary_name' => Setting::get('beneficiary_name', 'DAYANCO'),
-                'beneficiary_bank' => Setting::get('beneficiary_bank', 'Bank Name'),
-                'account_number' => Setting::get('account_number', '123456789'),
-                'swift_code' => Setting::get('swift_code', 'SWIFT123'),
-                'bank_address' => Setting::get('bank_address', 'Bank Address'),
-            ]
+                'beneficiary_name'    => Setting::get('beneficiary_name',    'DAYANCO TRADING CO., LIMITED'),
+                'beneficiary_bank'    => Setting::get('beneficiary_bank',    'ZHEJIANG CHOUZHOU COMMERCIAL BANK'),
+                'account_number'      => Setting::get('account_number',      'NRA1564714201050006871'),
+                'beneficiary_address' => Setting::get('beneficiary_address', '9F, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA'),
+                'bank_address'        => Setting::get('bank_address',        'YIWULEYUAN EAST, JIANGBEI RD, YIWU, ZHEJIANG CHINA'),
+                'swift_code'          => Setting::get('swift_code',          'CZCBCNLX'),
+                'country'             => 'China',
+                'purpose'             => 'PURCHASE OF GOODS',
+            ],
         ];
     }
 
     public function verifyOrder($orderNumber)
     {
         $order = Order::where('order_number', $orderNumber)->first();
-        
         if (!$order) {
             return response()->json(['message' => 'Order not found'], 404);
         }
-
         return response()->json([
             'order_number' => $order->order_number,
-            'customer' => $order->customer->full_name,
-            'product' => $order->product_name,
-            'quantity' => $order->quantity,
+            'product'      => $order->product_name,
+            'quantity'     => $order->quantity,
             'total_amount' => $order->final_price,
-            'sales_person' => $order->salesUser->name,
-            'status' => $order->status,
-            'created_at' => $order->created_at->format('Y-m-d H:i:s'),
-            'verified' => true
+            'sales_person' => optional($order->salesUser)->name,
+            'status'       => $order->status,
+            'created_at'   => $order->created_at->format('Y-m-d H:i:s'),
+            'verified'     => true,
         ]);
     }
 }

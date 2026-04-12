@@ -153,29 +153,23 @@ class AdminController extends Controller
     // Dashboard Statistics
     public function getDashboardStats()
     {
+        // Encrypted fields must be summed in PHP, not SQL
+        $paidOrders = Order::where('payment_confirmed', true)->get();
+        $totalRevenue = $paidOrders->sum(fn($o) => (float)($o->final_price ?? 0));
+
         $stats = [
-            'total_orders' => Order::count(),
-            'orders_by_status' => Order::selectRaw('status, COUNT(*) as count')
-                ->groupBy('status')
-                ->pluck('count', 'status'),
-            'total_revenue' => Order::where('payment_confirmed', true)->sum('final_price'),
-            'pending_orders' => Order::whereIn('status', ['draft', 'factory_pricing', 'manager_review'])->count(),
-            'completed_orders' => Order::where('status', 'completed')->count(),
-            'total_users' => User::count(),
-            'active_users' => User::where('is_active', true)->count(),
-            'users_by_role' => User::selectRaw('role, COUNT(*) as count')
-                ->groupBy('role')
-                ->pluck('count', 'role'),
+            'total_orders'         => Order::count(),
+            'orders_by_status'     => Order::selectRaw('status, COUNT(*) as count')
+                                        ->groupBy('status')->pluck('count', 'status'),
+            'total_revenue'        => $totalRevenue,
+            'pending_orders'       => Order::whereIn('status', ['draft','factory_pricing','manager_review'])->count(),
+            'completed_orders'     => Order::where('status', 'completed')->count(),
+            'total_users'          => User::count(),
+            'active_users'         => User::where('is_active', true)->count(),
+            'users_by_role'        => User::selectRaw('role, COUNT(*) as count')
+                                        ->groupBy('role')->pluck('count', 'role'),
+            'default_profit_margin'=> (float) Setting::get('default_profit_margin', 20),
         ];
-
-        // Monthly statistics for the last 6 months
-        $monthlyStats = Order::selectRaw('DATE_FORMAT(created_at, "%Y-%m") as month, COUNT(*) as orders, SUM(final_price) as revenue')
-            ->where('created_at', '>=', now()->subMonths(6))
-            ->groupBy('month')
-            ->orderBy('month')
-            ->get();
-
-        $stats['monthly_stats'] = $monthlyStats;
 
         return response()->json($stats);
     }
@@ -235,37 +229,51 @@ class AdminController extends Controller
     // Profit Analysis
     public function getProfitAnalysis(Request $request)
     {
-        $query = Order::where('payment_confirmed', true);
+        $query = Order::with(['salesUser'])->where('payment_confirmed', true);
 
         if ($request->date_from) {
             $query->whereDate('created_at', '>=', $request->date_from);
         }
-
         if ($request->date_to) {
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
         $orders = $query->get();
 
+        // Monthly profit for last 6 months
+        $monthlyData = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $m = now()->subMonths($i);
+            $key = $m->format('Y-m');
+            $label = $m->format('M Y');
+            $monthOrders = Order::with([])
+                ->where('payment_confirmed', true)
+                ->whereYear('created_at', $m->year)
+                ->whereMonth('created_at', $m->month)
+                ->get();
+            $monthlyData[$label] = $monthOrders->sum(fn($o) => max(0, (float)($o->final_price ?? 0) - (float)($o->factory_cost ?? 0)));
+        }
+
+        // Employee performance (all orders not just paid)
+        $allOrders = Order::with('salesUser')->get();
+        $empPerf = $allOrders->groupBy('sales_user_id')->map(function($group) {
+            $user = $group->first()->salesUser;
+            return [
+                'name'         => $user ? $user->name : 'Unknown',
+                'orders_count' => $group->count(),
+                'revenue'      => $group->sum(fn($o) => (float)($o->final_price ?? 0)),
+            ];
+        })->values();
+
         $analysis = [
-            'total_orders' => $orders->count(),
-            'total_revenue' => $orders->sum('final_price'),
-            'total_cost' => $orders->sum('factory_cost'),
-            'total_profit' => $orders->sum(function($order) {
-                return $order->final_price - $order->factory_cost;
-            }),
+            'total_orders'          => $orders->count(),
+            'total_revenue'         => $orders->sum(fn($o) => (float)($o->final_price ?? 0)),
+            'total_cost'            => $orders->sum(fn($o) => (float)($o->factory_cost ?? 0)),
+            'total_profit'          => $orders->sum(fn($o) => (float)($o->final_price ?? 0) - (float)($o->factory_cost ?? 0)),
             'average_profit_margin' => $orders->avg('profit_margin_percentage'),
-            'profit_by_sales_person' => $orders->groupBy('sales_user_id')->map(function($group) {
-                return [
-                    'sales_person' => $group->first()->salesUser->name,
-                    'orders_count' => $group->count(),
-                    'total_revenue' => $group->sum('final_price'),
-                    'total_profit' => $group->sum(function($order) {
-                        return $order->final_price - $order->factory_cost;
-                    }),
-                    'average_margin' => $group->avg('profit_margin_percentage'),
-                ];
-            })->values(),
+            'monthly_labels'        => array_keys($monthlyData),
+            'monthly_profit'        => array_values($monthlyData),
+            'employee_performance'  => $empPerf,
         ];
 
         return response()->json($analysis);
