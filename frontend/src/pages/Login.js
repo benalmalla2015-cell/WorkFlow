@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
 import { Form, Input, Button, Card, Alert, Divider, Typography } from 'antd';
 import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,17 +9,8 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const { login, isAuthenticated, loading: authLoading, user } = useAuth();
-  const navigate = useNavigate();
+  const { login } = useAuth();
   const [form] = Form.useForm();
-
-  // If already authenticated, redirect to role dashboard
-  if (!authLoading && isAuthenticated && user) {
-    const path = user.role === 'admin' ? '/admin/dashboard'
-      : user.role === 'sales' ? '/sales/orders'
-      : '/factory/orders';
-    return <Navigate to={path} replace />;
-  }
 
   const handleSubmit = async (values) => {
     setLoading(true);

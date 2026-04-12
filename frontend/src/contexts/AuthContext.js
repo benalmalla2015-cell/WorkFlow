@@ -4,6 +4,7 @@ import axios from 'axios';
 const AuthContext = createContext();
 
 const TOKEN_KEY = 'wf_token';
+const USER_KEY  = 'wf_user';
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -13,56 +14,29 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+// Read stored user synchronously (no API call needed on load)
+const getStoredUser = () => {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
 
+const getStoredToken = () => localStorage.getItem(TOKEN_KEY) || null;
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser]       = useState(getStoredUser);   // instant from storage
+  const [loading, setLoading] = useState(false);           // no async needed
+
+  // Set axios header immediately if token exists
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
+    const token = getStoredToken();
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      fetchUser();
-    } else {
-      setLoading(false);
     }
   }, []);
-
-  const fetchUser = async () => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    try {
-      // Use native fetch to avoid axios defaults/interceptor issues
-      const res = await fetch('/api/me', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
-        // Also set axios default for subsequent requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      } else {
-        // Token invalid - clear storage
-        localStorage.removeItem(TOKEN_KEY);
-        delete axios.defaults.headers.common['Authorization'];
-        setUser(null);
-      }
-    } catch (error) {
-      console.error('fetchUser error:', error);
-      localStorage.removeItem(TOKEN_KEY);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const login = async (credentials) => {
     try {
@@ -70,6 +44,7 @@ export const AuthProvider = ({ children }) => {
       const { user, token } = response.data;
       
       localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(user);
       
@@ -89,6 +64,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Logout error:', error);
     } finally {
       localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
       delete axios.defaults.headers.common['Authorization'];
       setUser(null);
     }
