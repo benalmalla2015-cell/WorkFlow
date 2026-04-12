@@ -129,49 +129,14 @@ const Login = () => {
           </Form.Item>
         </Form>
 
-        <Divider style={{ color: '#999', fontSize: 12 }}>Demo Accounts</Divider>
+        <Divider style={{ color: '#999', fontSize: 12 }}>تنبيه أمني</Divider>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[
-            { role: 'Admin', email: 'admin@workflow.com', pass: 'admin123', color: '#ff4d4f' },
-            { role: 'Sales', email: 'sales@workflow.com', pass: 'sales123', color: '#1890ff' },
-            { role: 'Factory', email: 'factory@workflow.com', pass: 'factory123', color: '#52c41a' },
-          ].map(({ role, email, pass, color }) => (
-            <div
-              key={role}
-              style={{
-                background: '#f8f9fa',
-                border: `1px solid ${color}33`,
-                borderRadius: 8,
-                padding: '8px 12px',
-                cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                transition: 'all 0.2s',
-              }}
-              onClick={() => {
-                form.setFieldsValue({ email, password: pass });
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = `${color}10`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#f8f9fa'; }}
-            >
-              <span>
-                <span style={{
-                  background: color,
-                  color: 'white',
-                  padding: '2px 8px',
-                  borderRadius: 4,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  marginRight: 8,
-                }}>{role}</span>
-                <Text style={{ fontSize: 12 }}>{email}</Text>
-              </span>
-              <Text type="secondary" style={{ fontSize: 11 }}>{pass}</Text>
-            </div>
-          ))}
-        </div>
+        <Alert
+          type="info"
+          showIcon
+          message="تم تعطيل عرض أي حسابات افتراضية حفاظاً على أمان النظام."
+          style={{ marginBottom: 8 }}
+        />
 
         <div style={{ textAlign: 'center', marginTop: 24 }}>
           <Text type="secondary" style={{ fontSize: 11 }}>
