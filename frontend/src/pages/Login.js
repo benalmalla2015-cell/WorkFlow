@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Form, Input, Button, Card, Alert, Divider, Typography } from 'antd';
 import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,31 +10,39 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const { login } = useAuth();
+  const { login, user, isAuthenticated, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [form] = Form.useForm();
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user) {
+      const path = user.role === 'admin' ? '/admin/dashboard'
+        : user.role === 'sales' ? '/sales/orders'
+        : '/factory/orders';
+      navigate(path, { replace: true });
+    }
+  }, [authLoading, isAuthenticated, user, navigate]);
 
   const handleSubmit = async (values) => {
     setLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
     const result = await login(values);
+    setLoading(false);
 
     if (result.success) {
       setSuccessMsg('Login successful! Redirecting...');
-      const role = result.user?.role || 'sales';
-      const path = role === 'admin' ? '/admin/dashboard'
-        : role === 'sales' ? '/sales/orders'
-        : '/factory/orders';
-      
-      // Force full page reload to ensure fresh state
-      setTimeout(() => {
-        window.location.replace(path);
-      }, 500);
     } else {
-      setLoading(false);
       setErrorMsg(result.error || 'Login failed. Please check your credentials.');
     }
   };
+
+  if (!authLoading && isAuthenticated && user) {
+    const path = user.role === 'admin' ? '/admin/dashboard'
+      : user.role === 'sales' ? '/sales/orders'
+      : '/factory/orders';
+    return <Navigate to={path} replace />;
+  }
 
   return (
     <div style={{
