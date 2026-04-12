@@ -240,7 +240,7 @@ class QuotationExport implements FromArray, WithEvents, WithTitle
                 $qrPng = QrCode::format('png')
                     ->size(100)
                     ->margin(1)
-                    ->generate(url('/api/orders/verify/' . $orderNum));
+                    ->generate(route('orders.verify', ['orderNumber' => $orderNum]));
 
                 $qrImage = @imagecreatefromstring($qrPng);
 

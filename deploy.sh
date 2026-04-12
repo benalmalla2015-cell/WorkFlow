@@ -162,9 +162,9 @@ cat > backup_workflow.sh << 'EOF'
 
 BACKUP_DIR=\"/home/u859266589/backups\"
 TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
-DB_NAME=\"u859266589_workflow\"
-DB_USER=\"u859266589_workflow\"
-DB_PASS=\"%@!9782aNOFAveetRi*^*\"
+DB_NAME=\"workflow_db\"
+DB_USER=\"workflow_user\"
+DB_PASS=\"change_me\"
 
 # Create database backup
 mysqldump -u \$DB_USER -p\"\$DB_PASS\" \$DB_NAME > \$BACKUP_DIR/db_backup_\$TIMESTAMP.sql

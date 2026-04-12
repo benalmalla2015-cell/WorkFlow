@@ -43,9 +43,9 @@ LOG_LEVEL=error
 DB_CONNECTION=mysql
 DB_HOST=localhost
 DB_PORT=3306
-DB_DATABASE=u859266589_workflow
-DB_USERNAME=u859266589_abdullmaelk
-DB_PASSWORD=P7##nB@4
+DB_DATABASE=workflow_db
+DB_USERNAME=workflow_user
+DB_PASSWORD=change_me
 
 CACHE_DRIVER=file
 FILESYSTEM_DISK=local
@@ -115,7 +115,7 @@ php artisan view:cache --quiet
 echo "  ✓ Application optimized"
 
 # ── Setup daily backup cron ─────────────────────────────────────
-CRON_JOB="0 2 * * * mysqldump -u u859266589_abdullmaelk -pP7##nB@4 u859266589_workflow > /home/u859266589/backups/workflow_\$(date +\%Y\%m\%d).sql 2>/dev/null"
+CRON_JOB="0 2 * * * mysqldump -u workflow_user -pchange_me workflow_db > /home/u859266589/backups/workflow_\$(date +\%Y\%m\%d).sql 2>/dev/null"
 mkdir -p /home/u859266589/backups
 (crontab -l 2>/dev/null | grep -v "workflow"; echo "$CRON_JOB") | crontab -
 

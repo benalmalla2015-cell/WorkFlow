@@ -33,9 +33,9 @@ cp .env.example .env
 sed -i 's/APP_ENV=local/APP_ENV=production/' .env
 sed -i 's/APP_DEBUG=true/APP_DEBUG=false/' .env
 sed -i 's|APP_URL=http://localhost|APP_URL=https://dayancosys.com|' .env
-sed -i 's/DB_DATABASE=workflow/DB_DATABASE=u859266589_workflow/' .env
-sed -i 's/DB_USERNAME=root/DB_USERNAME=u859266589_workflow/' .env
-sed -i 's/DB_PASSWORD=.*$/DB_PASSWORD="%@!9782aNOFAveetRi*^"/' .env
+sed -i 's/DB_DATABASE=workflow_db/DB_DATABASE=workflow_db/' .env
+sed -i 's/DB_USERNAME=workflow_user/DB_USERNAME=workflow_user/' .env
+sed -i 's/DB_PASSWORD=.*$/DB_PASSWORD="change_me"/' .env
 php artisan key:generate --force
 ```
 

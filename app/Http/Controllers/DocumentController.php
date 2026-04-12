@@ -3,17 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\Setting;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Maatwebsite\Excel\Facades\Excel;
-use Barryvdh\DomPDF\Facade\Pdf;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
-use App\Exports\QuotationExport;
+use App\Services\WorkflowDocumentService;
+use Illuminate\Validation\ValidationException;
 
 class DocumentController extends Controller
 {
+    public function __construct(private WorkflowDocumentService $documents)
+    {
+    }
+
     public function generateQuotation(Order $order)
     {
         $this->authorizeOrderDocumentAccess($order);
@@ -23,21 +24,16 @@ class DocumentController extends Controller
         }
 
         try {
-            $disk = config('workflow.documents_disk', 'public');
-            $root = trim(config('workflow.quotations_root', 'quotations'), '/');
-            $filename = 'quotation_' . $order->order_number . '_' . date('Ymd') . '.xlsx';
-            $export = new QuotationExport($order);
-            Excel::store($export, $root . '/' . $filename, $disk);
-
-            $order->update(['quotation_path' => $root . '/' . $filename]);
-            AuditLog::log('quotation_generated', $order);
+            $document = $this->documents->generateQuotation($order);
 
             return response()->json([
                 'message' => 'Quotation generated successfully',
-                'filename' => $filename,
+                'filename' => $document['filename'],
                 'download_url' => '/api/orders/' . $order->id . '/download-quotation'
             ]);
 
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Failed to generate quotation: ' . $e->getMessage()], 500);
         }
@@ -52,30 +48,16 @@ class DocumentController extends Controller
         }
 
         try {
-            $disk = config('workflow.documents_disk', 'public');
-            $root = trim(config('workflow.invoices_root', 'invoices'), '/');
-            // Generate QR code as base64 PNG
-            $qrData = url('/api/orders/verify/' . $order->order_number);
-            $qrPng  = QrCode::format('png')->size(120)->margin(1)->generate($qrData);
-            $qrBase64 = 'data:image/png;base64,' . base64_encode($qrPng);
-
-            $invoiceData = $this->prepareInvoiceData($order, $qrBase64);
-
-            $pdf = Pdf::loadView('invoices.template', $invoiceData);
-            $pdf->setPaper('a4', 'portrait');
-
-            $filename = 'invoice_' . $order->order_number . '_' . date('Ymd') . '.pdf';
-            Storage::disk($disk)->put($root . '/' . $filename, $pdf->output());
-
-            $order->update(['invoice_path' => $root . '/' . $filename]);
-            AuditLog::log('invoice_generated', $order);
+            $document = $this->documents->generateInvoice($order);
 
             return response()->json([
                 'message' => 'Invoice generated successfully',
-                'filename' => $filename,
+                'filename' => $document['filename'],
                 'download_url' => '/api/orders/' . $order->id . '/download-invoice'
             ]);
 
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Failed to generate invoice: ' . $e->getMessage()], 500);
         }
@@ -88,11 +70,11 @@ class DocumentController extends Controller
         $disk = config('workflow.documents_disk', 'public');
 
         if (!$order->quotation_path) {
-            return response()->json(['message' => 'Quotation not generated yet'], 404);
+            return $this->missingFileResponse('Quotation not generated yet');
         }
 
         if (!Storage::disk($disk)->exists($order->quotation_path)) {
-            return response()->json(['message' => 'File not found'], 404);
+            return $this->missingFileResponse('File not found');
         }
 
         return Storage::disk($disk)->download($order->quotation_path, basename($order->quotation_path));
@@ -105,11 +87,11 @@ class DocumentController extends Controller
         $disk = config('workflow.documents_disk', 'public');
 
         if (!$order->invoice_path) {
-            return response()->json(['message' => 'Invoice not generated yet'], 404);
+            return $this->missingFileResponse('Invoice not generated yet');
         }
 
         if (!Storage::disk($disk)->exists($order->invoice_path)) {
-            return response()->json(['message' => 'File not found'], 404);
+            return $this->missingFileResponse('File not found');
         }
 
         return Storage::disk($disk)->download($order->invoice_path, basename($order->invoice_path));
@@ -118,13 +100,13 @@ class DocumentController extends Controller
     public function downloadAttachment(\App\Models\Attachment $attachment)
     {
         if (!$attachment->canBeAccessedBy(request()->user())) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+            return $this->unauthorizedResponse();
         }
 
         $disk = config('workflow.uploads_disk', 'public');
 
         if (!Storage::disk($disk)->exists($attachment->path)) {
-            return response()->json(['message' => 'File not found'], 404);
+            return $this->missingFileResponse('File not found');
         }
 
         return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
@@ -145,47 +127,22 @@ class DocumentController extends Controller
         abort(403, 'Unauthorized');
     }
 
-    private function prepareInvoiceData($order, $qrBase64)
+    private function missingFileResponse($message)
     {
-        $qty  = max(1, (int)$order->quantity);
-        $total = (float)($order->final_price ?? 0);
-        $unit  = $qty > 0 ? $total / $qty : 0;
-        $days  = max(1, (int)($order->production_days ?? 30));
+        if (request()->wantsJson()) {
+            return response()->json(['message' => $message], 404);
+        }
 
-        return [
-            'order'          => $order,
-            'customer'       => $order->customer,
-            'sales_user'     => $order->salesUser,
-            'company'        => [
-                'name'    => Setting::get('company_name',    'DAYANCO TRADING CO., LIMITED'),
-                'address' => Setting::get('company_address', 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU 511455, P.R. CHINA'),
-                'phone'   => Setting::get('company_phone',   '+86 188188 45411'),
-                'email'   => Setting::get('company_email',   'team@dayancofficial.com'),
-                'attn'    => Setting::get('company_attn',    'Mr. Abdulmalek'),
-            ],
-            'qr_code_base64' => $qrBase64,
-            'invoice_number' => 'INV-' . $order->order_number,
-            'invoice_date'   => now()->format('F j\s\t, Y'),
-            'items'          => [[
-                'name'        => $order->product_name,
-                'description' => $order->specifications ?? '',
-                'quantity'    => $qty,
-                'production_days' => $days,
-                'unit_price'  => $unit,
-                'total'       => $total,
-            ]],
-            'subtotal' => $total,
-            'bank_details' => [
-                'beneficiary_name'    => Setting::get('beneficiary_name',    'DAYANCO TRADING CO., LIMITED'),
-                'beneficiary_bank'    => Setting::get('beneficiary_bank',    'ZHEJIANG CHOUZHOU COMMERCIAL BANK'),
-                'account_number'      => Setting::get('account_number',      'NRA1564714201050006871'),
-                'beneficiary_address' => Setting::get('beneficiary_address', '9F, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA'),
-                'bank_address'        => Setting::get('bank_address',        'YIWULEYUAN EAST, JIANGBEI RD, YIWU, ZHEJIANG CHINA'),
-                'swift_code'          => Setting::get('swift_code',          'CZCBCNLX'),
-                'country'             => 'China',
-                'purpose'             => 'PURCHASE OF GOODS',
-            ],
-        ];
+        return redirect()->back()->with('error', $message);
+    }
+
+    private function unauthorizedResponse()
+    {
+        if (request()->wantsJson()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        return redirect()->back()->with('error', 'Unauthorized');
     }
 
     public function verifyOrder($orderNumber)

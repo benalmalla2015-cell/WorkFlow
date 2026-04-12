@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
+use Illuminate\Pagination\Paginator;
 use App\Models\Setting;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
     {
         // Set default string length for MySQL
         Schema::defaultStringLength(191);
+
+        Paginator::useBootstrapFive();
 
         // Share settings with all views (safely)
         View::composer('*', function ($view) {
