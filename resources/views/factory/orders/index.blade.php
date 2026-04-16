@@ -3,24 +3,23 @@
 @section('title', 'طلبات المصنع | WorkFlow')
 
 @php
+    $showAdminPricing = auth()->user()?->isAdmin();
     $statusLabels = [
-        'factory_pricing' => 'Factory Pricing',
-        'manager_review' => 'Manager Review',
-        'approved' => 'Approved',
-        'customer_approved' => 'Customer Approved',
-        'payment_confirmed' => 'Payment Confirmed',
-        'completed' => 'Completed',
+        'sent_to_factory' => 'تم الإرسال إلى المصنع',
+        'factory_pricing' => 'عاد لتعديل تشغيلي',
+        'manager_review' => 'قيد مراجعة المدير',
+        'pending_approval' => 'طلب تعديل بانتظار الاعتماد',
+        'approved' => 'معتمد',
+        'customer_approved' => 'موافقة العميل مسجلة',
+        'payment_confirmed' => 'تم تأكيد الدفع',
+        'completed' => 'مكتمل',
     ];
 @endphp
 
 @section('content')
     <div class="mb-4">
         <h1 class="h3 mb-1">طلبات المصنع</h1>
-        <div class="text-muted">واجهة التسعير والمرفقات مع خصوصية كاملة لبيانات العميل.</div>
-    </div>
-
-    <div class="alert alert-warning border-0 shadow-sm mb-4">
-        لا تظهر هنا أي بيانات تخص العميل أو عنوانه أو ملاحظاته الشخصية. تظهر فقط المواصفات الفنية والمرفقات المسموح بها.
+        <div class="text-muted">متابعة طلبات التنفيذ والمواصفات الفنية والمرفقات المرتبطة بها.</div>
     </div>
 
     <div class="card page-card mb-4">
@@ -61,7 +60,9 @@
                             <th>المنتج</th>
                             <th>الكمية</th>
                             <th>المواصفات</th>
-                            <th>تكلفة المصنع</th>
+                            @if ($showAdminPricing)
+                                <th>تكلفة المصنع</th>
+                            @endif
                             <th>مدة الإنتاج</th>
                             <th>الحالة</th>
                             <th>إجراءات</th>
@@ -74,12 +75,20 @@
                                 <td>{{ $order->product_name }}</td>
                                 <td>{{ number_format($order->quantity) }}</td>
                                 <td>{{ \Illuminate\Support\Str::limit($order->specifications, 80) ?: '—' }}</td>
-                                <td>{{ $order->factory_cost ? '$' . number_format((float) $order->factory_cost, 2) : '—' }}</td>
+                                @if ($showAdminPricing)
+                                    <td>{{ $order->factory_cost ? '$' . number_format((float) $order->factory_cost, 2) : '—' }}</td>
+                                @endif
                                 <td>{{ $order->production_days ? $order->production_days . ' يوم' : '—' }}</td>
                                 <td><span class="badge-status status-{{ $order->status }}">{{ $statusLabels[$order->status] ?? $order->status }}</span></td>
                                 <td>
                                     <div class="d-flex flex-wrap gap-2">
                                         <a href="{{ route('factory.orders.edit', $order) }}" class="btn btn-sm btn-outline-primary">فتح</a>
+                                        @if (!$order->isDraft() && !$order->hasPendingChanges() && $order->canRequestAdjustmentBy(auth()->user()))
+                                            <a href="{{ route('factory.orders.adjustments.create', $order) }}" class="btn btn-sm btn-outline-primary">طلب تعديل</a>
+                                        @endif
+                                        @if ($order->status === 'pending_approval')
+                                            <span class="badge text-bg-warning">بانتظار اعتماد التعديل</span>
+                                        @endif
                                         @if ($order->status === 'manager_review')
                                             <span class="badge text-bg-warning">بانتظار المدير</span>
                                         @endif
@@ -88,7 +97,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">لا توجد طلبات متاحة حالياً.</td>
+                                <td colspan="{{ $showAdminPricing ? 8 : 7 }}" class="text-center py-5 text-muted">لا توجد طلبات متاحة حالياً.</td>
                             </tr>
                         @endforelse
                     </tbody>

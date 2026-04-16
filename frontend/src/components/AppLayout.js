@@ -14,6 +14,7 @@ import {
   BellOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -121,9 +122,7 @@ const AppLayout = ({ children }) => {
           />
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Badge count={0} showZero={false}>
-              <Button type="text" icon={<BellOutlined />} style={{ fontSize: 18 }} />
-            </Badge>
+            {user?.role === 'admin' && <NotificationBell />}
 
             <Dropdown
               menu={{ items: userMenuItems, onClick: handleUserMenuClick }}

@@ -7,6 +7,8 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\AdjustmentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -36,6 +38,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders/{order}', [OrderController::class, 'show']);
     Route::put('/orders/{order}', [OrderController::class, 'update']);
     Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus']);
+    Route::get('/orders/{order}/quotation-pdf', [OrderController::class, 'downloadQuotationPdf']);
+    Route::get('/orders/{order}/invoice-pdf', [OrderController::class, 'downloadInvoicePdf']);
     
     // Order Actions
     Route::post('/orders/{order}/approve', [OrderController::class, 'approveOrder']);
@@ -95,4 +99,27 @@ Route::middleware('auth:sanctum')->post('/upload', function (Request $request) {
     }
 
     return response()->json(['message' => 'No file uploaded'], 400);
+});
+
+// Notification Routes
+Route::middleware('auth:sanctum')->prefix('notifications')->group(function () {
+    Route::post('/token', [NotificationController::class, 'storeToken']);
+    Route::delete('/token', [NotificationController::class, 'removeToken']);
+    Route::get('/', [NotificationController::class, 'getNotifications']);
+    Route::get('/unread-count', [NotificationController::class, 'getUnreadCount']);
+    Route::post('/{notification}/read', [NotificationController::class, 'markAsRead']);
+});
+
+// Adjustment Routes
+Route::middleware('auth:sanctum')->prefix('adjustments')->group(function () {
+    Route::get('/my-requests', [AdjustmentController::class, 'myRequests']);
+    Route::post('/orders/{order}', [AdjustmentController::class, 'store']);
+    Route::get('/{adjustment}', [AdjustmentController::class, 'show']);
+    Route::delete('/{adjustment}', [AdjustmentController::class, 'cancel']);
+});
+
+// Admin Adjustment Routes
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin/adjustments')->group(function () {
+    Route::get('/', [AdjustmentController::class, 'index']);
+    Route::post('/{adjustment}/review', [AdjustmentController::class, 'review']);
 });

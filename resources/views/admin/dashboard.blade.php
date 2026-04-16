@@ -1,31 +1,48 @@
 @extends('layouts.app')
 
-@section('title', 'لوحة الإدارة | WorkFlow')
-
-@php
-    $statusLabels = [
-        'draft' => 'Draft',
-        'factory_pricing' => 'Factory Pricing',
-        'manager_review' => 'Manager Review',
-        'approved' => 'Approved',
-        'customer_approved' => 'Customer Approved',
-        'payment_confirmed' => 'Payment Confirmed',
-        'completed' => 'Completed',
-    ];
-@endphp
+@section('title', 'لوحة الاعتماد | WorkFlow')
 
 @section('content')
+    @php
+        $changeFieldLabels = [
+            'customer.full_name' => 'اسم العميل',
+            'customer.address' => 'عنوان العميل',
+            'customer.phone' => 'رقم التواصل',
+            'customer.email' => 'البريد الإلكتروني',
+            'order.customer_name' => 'اسم العميل على الطلب',
+            'order.product_name' => 'اسم المنتج',
+            'order.quantity' => 'الكمية',
+            'order.specifications' => 'المواصفات',
+            'order.customer_notes' => 'ملاحظات الطلب',
+            'order.supplier_name' => 'اسم المورد',
+            'order.product_code' => 'كود المنتج',
+            'order.factory_cost' => 'تكلفة المصنع',
+            'order.selling_price' => 'سعر البيع',
+            'order.profit_margin_percentage' => 'هامش الربح',
+            'order.final_price' => 'السعر النهائي',
+            'order.production_days' => 'مدة الإنتاج',
+            'order.factory_user_id' => 'مسؤول المصنع',
+            'order.status' => 'الحالة',
+        ];
+        $roleLabels = [
+            'admin' => 'الإدارة',
+            'sales' => 'المبيعات',
+            'factory' => 'المصنع',
+        ];
+    @endphp
+
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
         <div>
-            <h1 class="h3 mb-1">لوحة الإدارة</h1>
-            <div class="text-muted">مراجعة الطلبات والأرباح وأداء الموظفين داخل Laravel.</div>
+            <h1 class="h3 mb-1">لوحة الاعتماد</h1>
+            <div class="text-muted">عرض مركزي للطلبات التي تحتاج قرار اعتماد أو مراجعة تعديل قبل الانتقال للمرحلة التالية.</div>
         </div>
         <form method="GET" class="d-flex gap-2">
             <select name="status" class="form-select">
-                <option value="">كل الحالات</option>
-                @foreach ($statusLabels as $value => $label)
-                    <option value="{{ $value }}" @selected(($filters['status'] ?? '') === $value)>{{ $label }}</option>
-                @endforeach
+                <option value="">كل ما ينتظر الاعتماد</option>
+                <option value="manager_review" @selected(($filters['status'] ?? '') === 'manager_review')>طلبات بانتظار المدير</option>
+                <option value="pending_approval" @selected(($filters['status'] ?? '') === 'pending_approval')>طلبات تعديل معلقة</option>
+                <option value="approved" @selected(($filters['status'] ?? '') === 'approved')>طلبات معتمدة</option>
+                <option value="completed" @selected(($filters['status'] ?? '') === 'completed')>طلبات مكتملة</option>
             </select>
             <button type="submit" class="btn btn-dark">تصفية</button>
         </form>
@@ -51,35 +68,16 @@
         <div class="col-md-3">
             <div class="card stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted mb-2">إيراد محقق</div>
-                    <div class="display-6 fw-bold text-success">${{ number_format($stats['total_revenue'], 2) }}</div>
+                    <div class="text-muted mb-2">طلبات مراجعة المدير</div>
+                    <div class="display-6 fw-bold text-primary">{{ $stats['pending_manager_reviews'] }}</div>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted mb-2">المستخدمون النشطون</div>
-                    <div class="display-6 fw-bold">{{ $stats['active_users'] }}/{{ $stats['total_users'] }}</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-4 mb-4">
-        <div class="col-lg-6">
-            <div class="card page-card chart-card h-100">
-                <div class="card-body">
-                    <h2 class="h5 section-title">اتجاه الأرباح الشهرية</h2>
-                    <canvas id="profitChart"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-6">
-            <div class="card page-card chart-card h-100">
-                <div class="card-body">
-                    <h2 class="h5 section-title">توزيع الطلبات حسب الحالة</h2>
-                    <canvas id="statusChart"></canvas>
+                    <div class="text-muted mb-2">طلبات التعديل المعلقة</div>
+                    <div class="display-6 fw-bold text-danger">{{ $stats['pending_adjustments'] }}</div>
                 </div>
             </div>
         </div>
@@ -96,7 +94,7 @@
                             <th>العميل</th>
                             <th>المنتج</th>
                             <th>تكلفة المصنع</th>
-                            <th>الهامش الافتراضي</th>
+                            <th>الحالة الحالية</th>
                             <th>إجراء</th>
                         </tr>
                     </thead>
@@ -104,17 +102,17 @@
                         @forelse ($pendingApprovals as $order)
                             <tr>
                                 <td class="fw-semibold">{{ $order->order_number }}</td>
-                                <td>{{ optional($order->customer)->full_name ?: '—' }}</td>
+                                <td>{{ $order->resolvedCustomerName() ?: '—' }}</td>
                                 <td>{{ $order->product_name }}</td>
                                 <td>{{ $order->factory_cost ? '$' . number_format((float) $order->factory_cost, 2) : '—' }}</td>
-                                <td>{{ number_format($stats['default_profit_margin'], 2) }}%</td>
+                                <td><span class="badge-status status-{{ $order->status }}">{{ $order->status_label }}</span></td>
                                 <td>
                                     <a href="{{ route('admin.orders.review', $order) }}" class="btn btn-sm btn-primary">مراجعة واعتماد</a>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">لا توجد طلبات معلقة حالياً.</td>
+                                <td colspan="6" class="text-center text-muted py-4">لا توجد طلبات لدى المدير حاليًا.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -125,26 +123,104 @@
 
     <div class="card page-card mb-4">
         <div class="card-body">
-            <h2 class="h5 section-title">أداء موظفي المبيعات</h2>
+            <h2 class="h5 section-title">طلبات تعديل بانتظار الاعتماد</h2>
             <div class="table-responsive">
-                <table class="table align-middle mb-0">
+                <table class="table align-middle">
                     <thead>
                         <tr>
-                            <th>الموظف</th>
-                            <th>عدد الطلبات</th>
-                            <th>الإيراد التقديري</th>
+                            <th>رقم الطلب</th>
+                            <th>مقدم الطلب</th>
+                            <th>الدور</th>
+                            <th>وقت الإرسال</th>
+                            <th>الحقول المتغيرة</th>
+                            <th>إجراء</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($profitAnalysis['employee_performance'] as $employee)
+                        @forelse ($pendingChangeRequests as $order)
+                            @php
+                                $requester = $order->pendingAdjustmentLog?->requester ?: $order->pendingChangeRequester;
+                                $rawChangedFields = $order->pendingAdjustmentLog?->changed_fields
+                                    ?: ($order->pending_changes['changed_fields'] ?? []);
+                                $changedFields = collect($rawChangedFields)
+                                    ->map(function ($field) use ($changeFieldLabels) {
+                                        if (isset($changeFieldLabels[$field])) {
+                                            return $changeFieldLabels[$field];
+                                        }
+
+                                        if (preg_match('/^items\.\d+\./', $field)) {
+                                            return 'عناصر الطلب';
+                                        }
+
+                                        if (preg_match('/^attachments\.\d+\.(original_name|file_name)$/', $field)) {
+                                            return 'المرفقات';
+                                        }
+
+                                        if (preg_match('/^attachments\.\d+\./', $field)) {
+                                            return null;
+                                        }
+
+                                        return $changeFieldLabels[$field] ?? str($field)
+                                            ->replace(['order.', 'customer.'], '')
+                                            ->replace('_', ' ')
+                                            ->title()
+                                            ->toString();
+                                    })
+                                    ->filter()
+                                    ->unique()
+                                    ->values();
+                            @endphp
                             <tr>
-                                <td class="fw-semibold">{{ $employee['name'] }}</td>
-                                <td>{{ $employee['orders_count'] }}</td>
-                                <td>${{ number_format($employee['revenue'], 2) }}</td>
+                                <td class="fw-semibold">{{ $order->order_number }}</td>
+                                <td>{{ $requester?->name ?: ($order->pending_changes['requested_by']['name'] ?? '—') }}</td>
+                                <td>{{ $roleLabels[$requester?->role ?: ($order->pending_changes['requested_by']['role'] ?? '')] ?? '—' }}</td>
+                                <td>{{ $order->pending_change_requested_at?->format('Y-m-d H:i') ?: '—' }}</td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @forelse ($changedFields as $field)
+                                            <span class="badge text-bg-light border">{{ $field }}</span>
+                                        @empty
+                                            <span class="text-muted">—</span>
+                                        @endforelse
+                                    </div>
+                                </td>
+                                <td>
+                                    <a href="{{ route('admin.orders.pending-changes.review', $order) }}" class="btn btn-sm btn-primary">مقارنة واعتماد</a>
+                                </td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">لا توجد تعديلات معلقة حالياً.</td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card page-card mb-4">
+        <div class="card-body">
+            <h2 class="h5 section-title">إرشادات قرار الإدارة</h2>
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="border rounded-4 p-3 h-100 bg-light">
+                        <div class="fw-semibold mb-2">اعتماد</div>
+                        <div class="text-muted small">اعتمد الطلب عندما تكون تكلفة المصنع والمرفقات والهوامش مكتملة وجاهزة للإرسال التجاري.</div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="border rounded-4 p-3 h-100 bg-light">
+                        <div class="fw-semibold mb-2">طلب تعديل</div>
+                        <div class="text-muted small">استخدمه إذا احتجت تصحيحًا تشغيليًا أو تجاريًا قبل الاعتماد النهائي، مع كتابة سبب واضح يظهر في الإشعار.</div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="border rounded-4 p-3 h-100 bg-light">
+                        <div class="fw-semibold mb-2">رفض</div>
+                        <div class="text-muted small">ارفض الطلب أو التعديل إذا كان غير مطابق، وسيعود للمسار السابق مع توثيق سبب القرار.</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -158,36 +234,39 @@
                             <th>رقم الطلب</th>
                             <th>العميل</th>
                             <th>المنتج</th>
-                            <th>الكمية</th>
-                            <th>تكلفة المصنع</th>
-                            <th>السعر النهائي</th>
-                            <th>الهامش</th>
                             <th>الحالة</th>
-                            <th>إجراء</th>
+                            <th>صاحب المهمة الحالية</th>
+                            <th>الإجراء السريع</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($orders as $order)
+                            @php
+                                $currentOwner = $order->status === 'pending_approval'
+                                    ? ($order->pendingAdjustmentLog?->requester?->name ?: $order->pendingChangeRequester?->name)
+                                    : ($order->status === 'manager_review'
+                                        ? optional($order->factoryUser)->name
+                                        : optional($order->salesUser)->name);
+                            @endphp
                             <tr>
                                 <td class="fw-semibold">{{ $order->order_number }}</td>
-                                <td>{{ optional($order->customer)->full_name ?: '—' }}</td>
+                                <td>{{ $order->resolvedCustomerName() ?: '—' }}</td>
                                 <td>{{ $order->product_name }}</td>
-                                <td>{{ number_format($order->quantity) }}</td>
-                                <td>{{ $order->factory_cost ? '$' . number_format((float) $order->factory_cost, 2) : '—' }}</td>
-                                <td>{{ $order->final_price ? '$' . number_format((float) $order->final_price, 2) : '—' }}</td>
-                                <td>{{ $order->profit_margin_percentage ? number_format((float) $order->profit_margin_percentage, 2) . '%' : '—' }}</td>
-                                <td><span class="badge-status status-{{ $order->status }}">{{ $statusLabels[$order->status] ?? $order->status }}</span></td>
+                                <td><span class="badge-status status-{{ $order->status }}">{{ $order->status_label }}</span></td>
+                                <td>{{ $currentOwner ?: '—' }}</td>
                                 <td>
-                                    @if ($order->status === 'manager_review')
-                                        <a href="{{ route('admin.orders.review', $order) }}" class="btn btn-sm btn-outline-primary">مراجعة</a>
+                                    @if ($order->status === 'pending_approval')
+                                        <a href="{{ route('admin.orders.pending-changes.review', $order) }}" class="btn btn-sm btn-outline-danger">مراجعة التعديل</a>
+                                    @elseif ($order->status === 'manager_review')
+                                        <a href="{{ route('admin.orders.review', $order) }}" class="btn btn-sm btn-outline-primary">مراجعة الطلب</a>
                                     @else
-                                        <span class="text-muted">—</span>
+                                        <span class="text-muted">لا إجراء</span>
                                     @endif
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="text-center py-5 text-muted">لا توجد بيانات حالياً.</td>
+                                <td colspan="6" class="text-center py-5 text-muted">لا توجد طلبات مطابقة للتصفية الحالية.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -200,41 +279,3 @@
         {{ $orders->links() }}
     </div>
 @endsection
-
-@push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        const profitContext = document.getElementById('profitChart');
-        const statusContext = document.getElementById('statusChart');
-
-        if (profitContext) {
-            new Chart(profitContext, {
-                type: 'line',
-                data: {
-                    labels: @json($profitAnalysis['monthly_labels']),
-                    datasets: [{
-                        label: 'Monthly Profit (USD)',
-                        data: @json($profitAnalysis['monthly_profit']),
-                        borderColor: '#4f46e5',
-                        backgroundColor: 'rgba(79, 70, 229, 0.12)',
-                        fill: true,
-                        tension: 0.35,
-                    }],
-                },
-            });
-        }
-
-        if (statusContext) {
-            new Chart(statusContext, {
-                type: 'doughnut',
-                data: {
-                    labels: @json(array_keys($stats['orders_by_status']->toArray())),
-                    datasets: [{
-                        data: @json(array_values($stats['orders_by_status']->toArray())),
-                        backgroundColor: ['#94a3b8', '#60a5fa', '#fbbf24', '#4ade80', '#22d3ee', '#10b981', '#8b5cf6'],
-                    }],
-                },
-            });
-        }
-    </script>
-@endpush

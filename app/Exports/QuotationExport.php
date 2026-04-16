@@ -48,11 +48,11 @@ class QuotationExport implements FromArray, WithEvents, WithTitle
                 $custName  = optional($o->customer)->full_name ?? '?';
                 $orderNum  = $o->order_number;
                 $productName = $o->product_name;
-                $companyName = Setting::get('company_name', 'DAYANCO TRADING CO., LIMITED');
-                $companyAddress = Setting::get('company_address', 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA');
-                $companyPhone = Setting::get('company_phone', '+86 188188 45411');
-                $companyEmail = Setting::get('company_email', 'team@dayancofficial.com');
-                $companyAttn = Setting::get('company_attn', 'Mr. Abdulmalek');
+                $companyName = Setting::get('company_name', 'مؤسسة مدحت رشاد للحلول التقنية');
+                $companyAddress = Setting::get('company_address', 'يتم تحديد العنوان من لوحة الإعدادات');
+                $companyPhone = Setting::get('company_phone', '+967000000000');
+                $companyEmail = Setting::get('company_email', '');
+                $companyAttn = Setting::get('company_attn', 'الإدارة');
 
                 $green  = 'D5E8D4';
                 $blue   = 'DAE8FC';

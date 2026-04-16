@@ -35,7 +35,7 @@ return new class extends Migration
             $table->text('final_price')->nullable();
             
             // Status tracking
-            $table->enum('status', ['draft', 'factory_pricing', 'manager_review', 'approved', 'customer_approved', 'payment_confirmed', 'completed'])->default('draft');
+            $table->enum('status', ['draft', 'sent_to_factory', 'factory_pricing', 'manager_review', 'approved', 'customer_approved', 'payment_confirmed', 'completed'])->default('draft');
             $table->boolean('customer_approval')->default(false);
             $table->boolean('payment_confirmed')->default(false);
             $table->boolean('manager_approval')->default(false);

@@ -80,7 +80,9 @@ class Attachment extends Model
         }
 
         if ($user->isFactory()) {
-            $canAccessOrder = $this->order->factory_user_id === $user->id || $this->order->status === 'factory_pricing';
+            $canAccessOrder = $this->order->factory_user_id === $user->id
+                || $this->order->pending_change_requested_by === $user->id
+                || in_array($this->order->status, ['sent_to_factory', 'factory_pricing'], true);
 
             if (!$canAccessOrder) {
                 return false;

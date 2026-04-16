@@ -1,13 +1,13 @@
 @extends('layouts.guest')
 
-@section('title', 'تسجيل الدخول | WorkFlow')
+@section('title', 'تسجيل الدخول')
 
 @section('content')
     <div class="card guest-card">
         <div class="card-body p-5">
             <div class="text-center mb-4">
-                <div class="display-6 fw-bold text-primary">DAYANCO</div>
-                <div class="text-muted">Laravel + MySQL Workflow Portal</div>
+                <div class="h3 fw-bold text-primary">مؤسسة مدحت رشاد للحلول التقنية</div>
+                <div class="text-muted">نظام إدارة سير العمل | مؤسسة مدحت رشاد للحلول التقنية</div>
             </div>
 
             @if (session('success'))

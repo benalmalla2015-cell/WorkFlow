@@ -4,15 +4,19 @@
 
 @php
     $statusLabels = [
-        'draft' => 'Draft',
-        'factory_pricing' => 'Factory Pricing',
-        'manager_review' => 'Manager Review',
-        'approved' => 'Approved',
-        'customer_approved' => 'Customer Approved',
-        'payment_confirmed' => 'Payment Confirmed',
-        'completed' => 'Completed',
+        'draft' => 'جديد',
+        'sent_to_factory' => 'تم الإرسال إلى المصنع',
+        'factory_pricing' => 'عاد لتعديل تشغيلي',
+        'manager_review' => 'قيد مراجعة المدير',
+        'pending_approval' => 'طلب تعديل بانتظار الاعتماد',
+        'approved' => 'معتمد',
+        'customer_approved' => 'موافقة العميل مسجلة',
+        'payment_confirmed' => 'تم تأكيد الدفع',
+        'completed' => 'مكتمل',
     ];
-    $canEdit = $order->status === 'factory_pricing';
+    $canEdit = auth()->user()?->isAdmin() || (!$order->hasPendingChanges() && $order->status === 'sent_to_factory');
+    $showFactoryGuidance = auth()->user()?->isFactory();
+    $canRequestAdjustment = !$canEdit && !$order->hasPendingChanges() && $order->canRequestAdjustmentBy(auth()->user());
 @endphp
 
 @section('content')
@@ -27,9 +31,29 @@
         </div>
     </div>
 
-    <div class="alert alert-warning border-0 shadow-sm">
-        لا يسمح لهذه الشاشة بإظهار بيانات العميل أو عنوانه أو ملاحظاته. المعروض هنا يقتصر على المواصفات الفنية والمرفقات المسموح بها.
-    </div>
+    @if ($showFactoryGuidance)
+        <div class="alert alert-warning border-0 shadow-sm">تنبيه: يرجى التقيد بالمواصفات الفنية المرفقة عند التنفيذ.</div>
+    @endif
+
+    @if ($order->status === 'sent_to_factory' && $canEdit)
+        <div class="alert alert-primary border-0 shadow-sm">هذا هو الإدخال الأولي لتسعير المصنع. بعد إرسال التسعير للإدارة ستصبح أي تعديلات لاحقة عبر طلب تعديل رسمي فقط.</div>
+    @endif
+
+    @if ($order->hasPendingChanges())
+        <div class="alert alert-warning border-0 shadow-sm">يوجد تعديل معلّق لهذا الطلب بانتظار اعتماد المدير، لذا تم تعطيل أي تعديل إضافي مؤقتًا.</div>
+    @endif
+
+    @if (!$canEdit && !$order->hasPendingChanges())
+        <div class="alert alert-info border-0 shadow-sm d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <div class="fw-semibold mb-1">الحقول الأصلية مقفلة</div>
+                <div>لا يمكن تعديل السجل الأصلي مباشرة في هذه المرحلة. استخدم طلب تعديل رسمي لإرسال التغييرات إلى الإدارة.</div>
+            </div>
+            @if ($canRequestAdjustment)
+                <a href="{{ route('factory.orders.adjustments.create', $order) }}" class="btn btn-primary">طلب تعديل</a>
+            @endif
+        </div>
+    @endif
 
     <div class="row g-4">
         <div class="col-lg-5">
@@ -54,7 +78,7 @@
                         @forelse ($order->attachments->where('type', 'sales_upload') as $attachment)
                             <a href="{{ route('attachments.download', $attachment) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                 <span>{{ $attachment->original_name }}</span>
-                                <span class="text-muted small">Reference</span>
+                                <span class="text-muted small">مرجعي</span>
                             </a>
                         @empty
                             <div class="text-muted">لا توجد مرفقات مرجعية.</div>
@@ -75,22 +99,19 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">اسم المورد</label>
-                                <input type="text" name="supplier_name" class="form-control" value="{{ old('supplier_name', $order->supplier_name) }}" @disabled(!$canEdit) required>
+                                <input type="text" name="supplier_name" class="form-control" value="{{ old('supplier_name', $order->supplier_name) }}" @readonly(!$canEdit) required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">كود المنتج</label>
-                                <input type="text" name="product_code" class="form-control" value="{{ old('product_code', $order->product_code) }}" @disabled(!$canEdit) required>
+                                <input type="text" name="product_code" class="form-control" value="{{ old('product_code', $order->product_code) }}" @readonly(!$canEdit) required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">تكلفة المصنع USD</label>
-                                <input type="number" step="0.01" min="0" name="factory_cost" class="form-control" value="{{ old('factory_cost', $order->factory_cost) }}" @disabled(!$canEdit) required>
+                                <input type="number" step="0.01" min="0" name="factory_cost" class="form-control" value="{{ old('factory_cost', $order->factory_cost) }}" @readonly(!$canEdit) required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">مدة الإنتاج بالأيام</label>
-                                <input type="number" min="1" name="production_days" class="form-control" value="{{ old('production_days', $order->production_days) }}" @disabled(!$canEdit) required>
-                            </div>
-                            <div class="col-12">
-                                <div class="alert alert-info mb-0">سيتم تطبيق هامش ربح افتراضي {{ $defaultMargin }}% تلقائياً ثم إرسال الطلب إلى المدير للمراجعة.</div>
+                                <input type="number" min="1" name="production_days" class="form-control" value="{{ old('production_days', $order->production_days) }}" @readonly(!$canEdit) required>
                             </div>
                         </div>
                     </div>
@@ -99,14 +120,14 @@
                 <div class="card form-card mb-4">
                     <div class="card-body p-4">
                         <h2 class="h5 section-title">مرفقات المصنع</h2>
-                        <input type="file" name="attachments[]" class="form-control" multiple @disabled(!$canEdit) accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png">
+                        <input type="file" name="attachments[]" class="form-control" multiple @readonly(!$canEdit) accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png">
                         <div class="form-text">يمكنك رفع عروض المورد أو ملفات المواصفات أو الصور.</div>
 
                         <div class="attachment-list list-group list-group-flush mt-3">
                             @forelse ($order->attachments->where('type', 'factory_upload') as $attachment)
                                 <a href="{{ route('attachments.download', $attachment) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                     <span>{{ $attachment->original_name }}</span>
-                                    <span class="text-muted small">Factory</span>
+                                    <span class="text-muted small">مصنع</span>
                                 </a>
                             @empty
                                 <div class="text-muted">لا توجد مرفقات مصنع مضافة بعد.</div>
@@ -117,8 +138,6 @@
 
                 @if ($canEdit)
                     <button type="submit" class="btn btn-primary btn-lg w-100">إرسال التسعير لمراجعة المدير</button>
-                @else
-                    <div class="alert alert-secondary mb-0">هذا الطلب في حالة {{ $statusLabels[$order->status] ?? $order->status }} ولا يمكن تعديله حالياً.</div>
                 @endif
             </form>
         </div>

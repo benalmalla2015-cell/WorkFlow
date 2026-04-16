@@ -29,21 +29,21 @@ return new class extends Migration
             ],
             [
                 'key' => 'company_name',
-                'value' => 'DAYANCO',
+                'value' => 'مؤسسة مدحت رشاد للحلول التقنية',
                 'description' => 'Company name for documents',
                 'created_at' => now(),
                 'updated_at' => now()
             ],
             [
                 'key' => 'company_address',
-                'value' => 'Company Address, City, Country',
+                'value' => 'العنوان يحدد من إعدادات النظام',
                 'description' => 'Company address for documents',
                 'created_at' => now(),
                 'updated_at' => now()
             ],
             [
                 'key' => 'company_phone',
-                'value' => '+1234567890',
+                'value' => '+967000000000',
                 'description' => 'Company phone for documents',
                 'created_at' => now(),
                 'updated_at' => now()

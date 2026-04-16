@@ -5,8 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 
 class Order extends Model
 {
@@ -15,6 +15,7 @@ class Order extends Model
     protected $fillable = [
         'order_number',
         'customer_id',
+        'customer_name',
         'sales_user_id',
         'factory_user_id',
         'customer_notes',
@@ -29,6 +30,10 @@ class Order extends Model
         'profit_margin_percentage',
         'final_price',
         'status',
+        'pending_changes',
+        'pending_change_requested_by',
+        'pending_change_requested_at',
+        'pending_change_original_status',
         'customer_approval',
         'payment_confirmed',
         'manager_approval',
@@ -39,40 +44,71 @@ class Order extends Model
 
     protected $casts = [
         'profit_margin_percentage' => 'decimal:2',
+        'pending_changes' => 'array',
+        'pending_change_requested_at' => 'datetime',
         'customer_approval' => 'boolean',
         'payment_confirmed' => 'boolean',
         'manager_approval' => 'boolean',
     ];
-    // Note: factory_cost, selling_price, final_price, customer_notes, supplier_name
-    // are handled via encrypt/decrypt mutators below - do NOT cast them here
 
     protected static function booted()
     {
         static::addGlobalScope('privacy', function ($builder) {
             $user = Auth::user();
-            
+
             if (!$user) {
                 return $builder;
             }
 
-            // Sales users can't see factory data
             if ($user->isSales()) {
                 $builder->select([
-                    'id', 'order_number', 'customer_id', 'sales_user_id', 
-                    'customer_notes', 'product_name', 'quantity', 'specifications',
-                    'selling_price', 'final_price', 'status', 'customer_approval',
-                    'payment_confirmed', 'manager_approval', 'quotation_path',
-                    'invoice_path', 'qr_code_path', 'created_at', 'updated_at'
+                    'id',
+                    'order_number',
+                    'customer_id',
+                    'customer_name',
+                    'sales_user_id',
+                    'customer_notes',
+                    'product_name',
+                    'quantity',
+                    'specifications',
+                    'selling_price',
+                    'final_price',
+                    'status',
+                    'pending_changes',
+                    'pending_change_requested_by',
+                    'pending_change_requested_at',
+                    'pending_change_original_status',
+                    'customer_approval',
+                    'payment_confirmed',
+                    'manager_approval',
+                    'quotation_path',
+                    'invoice_path',
+                    'qr_code_path',
+                    'created_at',
+                    'updated_at',
                 ]);
             }
 
-            // Factory users can't see customer data
             if ($user->isFactory()) {
                 $builder->select([
-                    'id', 'order_number', 'sales_user_id', 'factory_user_id',
-                    'product_name', 'quantity', 'specifications', 'supplier_name',
-                    'product_code', 'factory_cost', 'production_days', 'status',
-                    'created_at', 'updated_at'
+                    'id',
+                    'order_number',
+                    'sales_user_id',
+                    'factory_user_id',
+                    'product_name',
+                    'quantity',
+                    'specifications',
+                    'supplier_name',
+                    'product_code',
+                    'factory_cost',
+                    'production_days',
+                    'status',
+                    'pending_changes',
+                    'pending_change_requested_by',
+                    'pending_change_requested_at',
+                    'pending_change_original_status',
+                    'created_at',
+                    'updated_at',
                 ]);
             }
         });
@@ -93,6 +129,23 @@ class Order extends Model
         return $this->belongsTo(User::class, 'factory_user_id');
     }
 
+    public function pendingChangeRequester()
+    {
+        return $this->belongsTo(User::class, 'pending_change_requested_by');
+    }
+
+    public function adjustmentLogs()
+    {
+        return $this->hasMany(AdjustmentLog::class)->latest('created_at');
+    }
+
+    public function pendingAdjustmentLog()
+    {
+        return $this->hasOne(AdjustmentLog::class)
+            ->where('status', 'pending')
+            ->latestOfMany();
+    }
+
     public function attachments()
     {
         return $this->hasMany(Attachment::class);
@@ -108,7 +161,11 @@ class Order extends Model
         return $this->attachments()->where('type', 'factory_upload');
     }
 
-    // Encryption methods for sensitive data
+    public function items()
+    {
+        return $this->hasMany(OrderItem::class)->orderBy('id');
+    }
+
     public function setSupplierNameAttribute($value)
     {
         $this->attributes['supplier_name'] = Crypt::encrypt($value);
@@ -159,7 +216,63 @@ class Order extends Model
         return $value ? Crypt::decrypt($value) : null;
     }
 
-    // Status methods
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->status) {
+            'draft' => 'جديد',
+            'sent_to_factory' => 'تم الإرسال إلى المصنع',
+            'factory_pricing' => 'عاد لتعديل تشغيلي',
+            'manager_review' => 'قيد مراجعة المدير',
+            'pending_approval' => 'طلب تعديل بانتظار الاعتماد',
+            'approved' => 'معتمد',
+            'customer_approved' => 'موافقة العميل مسجلة',
+            'payment_confirmed' => 'تم تأكيد الدفع',
+            'completed' => 'مكتمل',
+            default => ucwords(str_replace('_', ' ', $this->status)),
+        };
+    }
+
+    public function getWorkflowStageAttribute(): string
+    {
+        return match ($this->status) {
+            'draft' => 'new',
+            'sent_to_factory', 'factory_pricing', 'manager_review', 'pending_approval' => 'processing',
+            'approved', 'customer_approved', 'payment_confirmed' => 'ready',
+            'completed' => 'completed',
+            default => 'new',
+        };
+    }
+
+    public function resolvedCustomerName(): ?string
+    {
+        if ($this->customer_name) {
+            return $this->customer_name;
+        }
+
+        if ($this->relationLoaded('customer')) {
+            return optional($this->customer)->full_name;
+        }
+
+        return optional($this->customer)->full_name;
+    }
+
+    public function resolvedItems()
+    {
+        $items = $this->relationLoaded('items') ? $this->items : $this->items()->get();
+
+        if ($items->isNotEmpty()) {
+            return $items;
+        }
+
+        return collect([
+            new OrderItem([
+                'item_name' => $this->product_name,
+                'quantity' => $this->quantity,
+                'description' => $this->specifications,
+            ]),
+        ])->filter(fn ($item) => filled($item->item_name));
+    }
+
     public function isDraft()
     {
         return $this->status === 'draft';
@@ -167,12 +280,17 @@ class Order extends Model
 
     public function isFactoryPricing()
     {
-        return $this->status === 'factory_pricing';
+        return in_array($this->status, ['factory_pricing', 'sent_to_factory'], true);
     }
 
     public function isManagerReview()
     {
         return $this->status === 'manager_review';
+    }
+
+    public function isPendingApproval()
+    {
+        return $this->status === 'pending_approval';
     }
 
     public function isApproved()
@@ -195,18 +313,81 @@ class Order extends Model
         return $this->status === 'completed';
     }
 
+    public function hasPendingChanges(): bool
+    {
+        if (!empty($this->pending_changes)) {
+            return true;
+        }
+
+        if ($this->relationLoaded('pendingAdjustmentLog')) {
+            return $this->pendingAdjustmentLog !== null;
+        }
+
+        return $this->pendingAdjustmentLog()->exists();
+    }
+
+    public function isSentToFactory(): bool
+    {
+        return in_array($this->status, [
+            'sent_to_factory',
+            'factory_pricing',
+            'manager_review',
+            'pending_approval',
+            'approved',
+            'customer_approved',
+            'payment_confirmed',
+            'completed',
+        ], true);
+    }
+
+    public function isLockedForNonAdmin(): bool
+    {
+        return $this->isSentToFactory();
+    }
+
+    public function canRequestAdjustmentBy($user): bool
+    {
+        if ($user->isAdmin() || $this->hasPendingChanges()) {
+            return false;
+        }
+
+        if ($user->isSales()) {
+            return $this->sales_user_id === $user->id && !$this->isDraft();
+        }
+
+        if ($user->isFactory()) {
+            return !$this->isDraft()
+                && $this->status !== 'sent_to_factory'
+                && ($this->factory_user_id === $user->id || $this->status === 'factory_pricing');
+        }
+
+        return false;
+    }
+
     public function canBeEditedBy($user)
     {
         if ($user->isAdmin()) {
             return true;
         }
 
+        if ($this->hasPendingChanges()) {
+            return false;
+        }
+
+        if ($user->isFactory() && $this->status === 'sent_to_factory') {
+            return true;
+        }
+
+        if ($this->isLockedForNonAdmin()) {
+            return false;
+        }
+
         if ($user->isSales() && $this->sales_user_id === $user->id) {
-            return $this->status === 'draft';
+            return true;
         }
 
         if ($user->isFactory()) {
-            return $this->status === 'factory_pricing';
+            return $this->factory_user_id === $user->id || $this->status === 'factory_pricing';
         }
 
         return false;

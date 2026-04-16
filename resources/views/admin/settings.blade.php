@@ -21,9 +21,6 @@
                             <label class="form-label">الهامش الافتراضي (%)</label>
                             <input type="number" min="0" max="500" step="0.01" name="default_profit_margin" class="form-control form-control-lg" value="{{ old('default_profit_margin', $settingsData['default_profit_margin'] ?? 20) }}" required>
                         </div>
-                        <div class="col-md-8">
-                            <div class="alert alert-info mb-0">يتم تطبيق هذا الهامش تلقائيًا بعد تسعير المصنع ويمكن للمدير تعديله يدويًا لكل طلب.</div>
-                        </div>
                     </div>
                 </div>
             </div>

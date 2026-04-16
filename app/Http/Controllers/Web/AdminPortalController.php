@@ -7,6 +7,9 @@ use App\Models\AuditLog;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Models\User;
+use App\Notifications\OrderStatusUpdatedNotification;
+use App\Services\OrderChangeService;
+use App\Services\UserNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -15,68 +18,57 @@ use Spatie\Permission\Models\Role;
 
 class AdminPortalController extends Controller
 {
+    public function __construct(
+        private OrderChangeService $orderChanges,
+        private UserNotificationService $notifications
+    )
+    {
+    }
+
     public function dashboard(Request $request)
     {
-        $ordersQuery = Order::withoutGlobalScopes()->with(['customer', 'salesUser', 'factoryUser']);
+        $ordersQuery = Order::withoutGlobalScopes()->with([
+            'customer',
+            'salesUser',
+            'factoryUser',
+            'items',
+            'pendingChangeRequester',
+            'pendingAdjustmentLog.requester',
+        ]);
 
         if ($request->filled('status')) {
             $ordersQuery->where('status', $request->string('status'));
+        } else {
+            $ordersQuery->whereIn('status', ['manager_review', 'pending_approval']);
         }
 
-        $orders = $ordersQuery->orderByDesc('created_at')->paginate(20)->withQueryString();
-        $allOrders = Order::withoutGlobalScopes()->with(['customer', 'salesUser', 'factoryUser'])->get();
-        $paidOrders = Order::withoutGlobalScopes()->where('payment_confirmed', true)->get();
-        $pendingApprovals = $allOrders->where('status', 'manager_review')->values();
-        $totalRevenue = $paidOrders->sum(fn ($order) => (float) ($order->final_price ?? 0));
-        $ordersByStatus = $allOrders->groupBy('status')->map->count();
-        $defaultMargin = (float) Setting::get('default_profit_margin', 20);
-        $monthlyProfit = [];
-        $monthlyLabels = [];
-
-        for ($i = 5; $i >= 0; $i--) {
-            $month = now()->subMonths($i);
-            $monthlyLabels[] = $month->format('M Y');
-
-            $value = Order::withoutGlobalScopes()
-                ->where('payment_confirmed', true)
-                ->whereYear('created_at', $month->year)
-                ->whereMonth('created_at', $month->month)
-                ->get()
-                ->sum(fn ($order) => max(0, (float) ($order->final_price ?? 0) - (float) ($order->factory_cost ?? 0)));
-
-            $monthlyProfit[] = round($value, 2);
-        }
-
-        $employeePerformance = $allOrders
-            ->groupBy('sales_user_id')
-            ->map(function ($group) {
-                $user = optional($group->first())->salesUser;
-
-                return [
-                    'name' => $user?->name ?? 'Unknown',
-                    'orders_count' => $group->count(),
-                    'revenue' => round($group->sum(fn ($order) => (float) ($order->final_price ?? 0)), 2),
-                ];
+        $orders = $ordersQuery->orderByDesc('updated_at')->paginate(20)->withQueryString();
+        $allOrders = Order::withoutGlobalScopes()->with(['customer', 'salesUser', 'factoryUser', 'items'])->get();
+        $pendingApprovals = Order::withoutGlobalScopes()
+            ->with(['customer', 'salesUser', 'factoryUser', 'items'])
+            ->where('status', 'manager_review')
+            ->orderByDesc('updated_at')
+            ->get();
+        $pendingChangeRequests = Order::withoutGlobalScopes()
+            ->with(['customer', 'salesUser', 'factoryUser', 'pendingChangeRequester', 'pendingAdjustmentLog.requester'])
+            ->where('status', 'pending_approval')
+            ->where(function ($builder) {
+                $builder->whereNotNull('pending_changes')
+                    ->orWhereHas('pendingAdjustmentLog', fn ($query) => $query->where('status', 'pending'));
             })
-            ->values();
+            ->orderByDesc('pending_change_requested_at')
+            ->get();
 
         return view('admin.dashboard', [
             'orders' => $orders,
             'pendingApprovals' => $pendingApprovals,
+            'pendingChangeRequests' => $pendingChangeRequests,
             'stats' => [
                 'total_orders' => $allOrders->count(),
-                'pending_orders' => $allOrders->whereIn('status', ['draft', 'factory_pricing', 'manager_review'])->count(),
-                'completed_orders' => $allOrders->where('status', 'completed')->count(),
-                'total_revenue' => $totalRevenue,
-                'total_users' => User::count(),
-                'active_users' => User::where('is_active', true)->count(),
-                'orders_by_status' => $ordersByStatus,
-                'default_profit_margin' => $defaultMargin,
-            ],
-            'profitAnalysis' => [
-                'monthly_labels' => $monthlyLabels,
-                'monthly_profit' => $monthlyProfit,
-                'employee_performance' => $employeePerformance,
+                'pending_orders' => $pendingApprovals->count() + $pendingChangeRequests->count(),
+                'pending_manager_reviews' => $pendingApprovals->count(),
+                'pending_adjustments' => $pendingChangeRequests->count(),
+                'default_profit_margin' => (float) Setting::get('default_profit_margin', 20),
             ],
             'filters' => $request->only(['status']),
         ]);
@@ -85,8 +77,12 @@ class AdminPortalController extends Controller
     public function reviewOrder(Order $order)
     {
         $order = Order::withoutGlobalScopes()
-            ->with(['customer', 'salesUser', 'factoryUser', 'attachments.uploadedBy'])
+            ->with(['customer', 'salesUser', 'factoryUser', 'attachments.uploadedBy', 'items'])
             ->findOrFail($order->id);
+
+        if ($order->hasPendingChanges() && $order->isPendingApproval()) {
+            return redirect()->route('admin.orders.pending-changes.review', $order);
+        }
 
         return view('admin.orders.review', [
             'order' => $order,
@@ -94,9 +90,142 @@ class AdminPortalController extends Controller
         ]);
     }
 
-    public function approveOrder(Request $request, Order $order)
+    public function reviewPendingChange(Order $order)
+    {
+        $order = Order::withoutGlobalScopes()
+            ->with(['customer', 'salesUser', 'factoryUser', 'attachments.uploadedBy', 'items', 'pendingChangeRequester', 'pendingAdjustmentLog.requester'])
+            ->findOrFail($order->id);
+
+        abort_unless($order->hasPendingChanges() && $order->isPendingApproval(), 404);
+
+        return view('admin.orders.pending-change-review', [
+            'order' => $order,
+            'pendingChanges' => $order->pendingAdjustmentLog?->current_payload
+                ? [
+                    'current' => $order->pendingAdjustmentLog?->current_payload,
+                    'proposed' => $order->pendingAdjustmentLog?->proposed_payload,
+                    'changed_fields' => $order->pendingAdjustmentLog?->changed_fields,
+                    'requested_by' => [
+                        'id' => $order->pendingAdjustmentLog?->requester?->id,
+                        'name' => $order->pendingAdjustmentLog?->requester?->name,
+                        'role' => $order->pendingAdjustmentLog?->requester?->role,
+                    ],
+                    'previous_status' => $order->pendingAdjustmentLog?->previous_status,
+                    'target_status' => $order->pendingAdjustmentLog?->target_status,
+                ]
+                : ($order->pending_changes ?? []),
+        ]);
+    }
+
+    public function approvePendingChange(Request $request, Order $order)
     {
         $order = Order::withoutGlobalScopes()->findOrFail($order->id);
+
+        if (!$order->hasPendingChanges() || !$order->isPendingApproval()) {
+            return back()->with('error', 'لا يوجد طلب تعديل معلّق لهذا الطلب.');
+        }
+
+        $this->orderChanges->approvePendingChange($order, $request->user());
+
+        return redirect()->route('admin.dashboard')->with('success', 'تم اعتماد التعديلات المقترحة وتثبيت البيانات الأصلية.');
+    }
+
+    public function rejectPendingChange(Request $request, Order $order)
+    {
+        $order = Order::withoutGlobalScopes()->findOrFail($order->id);
+
+        if (!$order->hasPendingChanges() || !$order->isPendingApproval()) {
+            return back()->with('error', 'لا يوجد طلب تعديل معلّق لهذا الطلب.');
+        }
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $this->orderChanges->rejectPendingChange($order, $request->user(), $validated['reason'] ?? null);
+
+        return redirect()->route('admin.dashboard')->with('success', 'تم رفض التعديلات المقترحة وإعادة الطلب لحالته السابقة.');
+    }
+
+    public function requestPendingChangeRevision(Request $request, Order $order)
+    {
+        $order = Order::withoutGlobalScopes()->findOrFail($order->id);
+
+        if (!$order->hasPendingChanges() || !$order->isPendingApproval()) {
+            return back()->with('error', 'لا يوجد طلب تعديل معلّق لهذا الطلب.');
+        }
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $this->orderChanges->requestPendingChangeRevision($order, $request->user(), $validated['reason'] ?? null);
+
+        return redirect()->route('admin.dashboard')->with('success', 'تم طلب تعديل إضافي من الموظف المعني.');
+    }
+
+    public function updateWorkflowStage(Request $request, Order $order)
+    {
+        $order = Order::withoutGlobalScopes()->findOrFail($order->id);
+        if ($order->hasPendingChanges() || $order->isPendingApproval()) {
+            return back()->with('error', 'لا يمكن تغيير المرحلة يدويًا أثناء وجود طلب تعديل معلّق بانتظار الاعتماد.');
+        }
+
+        $validated = $request->validate([
+            'workflow_stage' => ['required', Rule::in(['new', 'processing', 'ready', 'completed'])],
+        ]);
+
+        $oldValues = $order->toArray();
+        $stage = $validated['workflow_stage'];
+        $processingStatus = $order->factory_cost ? 'factory_pricing' : 'sent_to_factory';
+        $updates = match ($stage) {
+            'new' => [
+                'status' => 'draft',
+                'manager_approval' => false,
+                'customer_approval' => false,
+                'payment_confirmed' => false,
+            ],
+            'processing' => [
+                'status' => $processingStatus,
+                'manager_approval' => false,
+                'customer_approval' => false,
+                'payment_confirmed' => false,
+            ],
+            'ready' => [
+                'status' => 'approved',
+                'manager_approval' => true,
+            ],
+            'completed' => [
+                'status' => 'completed',
+                'manager_approval' => true,
+                'customer_approval' => true,
+                'payment_confirmed' => true,
+            ],
+        };
+
+        if (in_array($stage, ['ready', 'completed'], true) && $order->factory_cost && !$order->final_price) {
+            $margin = (float) ($order->profit_margin_percentage ?: Setting::get('default_profit_margin', 20));
+            $finalPrice = (float) $order->factory_cost * (1 + ($margin / 100));
+            $updates['profit_margin_percentage'] = $margin;
+            $updates['selling_price'] = $finalPrice;
+            $updates['final_price'] = $finalPrice;
+        }
+
+        $order->update($updates);
+        AuditLog::log('workflow_stage_updated', $order, $oldValues, $order->toArray());
+
+        return redirect()->route('admin.dashboard')->with('success', 'تم تحديث مرحلة الطلب بنجاح.');
+    }
+
+    public function approveOrder(Request $request, Order $order)
+    {
+        $order = Order::withoutGlobalScopes()->with(['salesUser', 'factoryUser'])->findOrFail($order->id);
+
+        if ($order->hasPendingChanges() || $order->isPendingApproval()) {
+            return redirect()
+                ->route('admin.orders.pending-changes.review', $order)
+                ->with('error', 'يوجد طلب تعديل معلّق يجب مراجعته أولاً قبل اعتماد الطلب بالطريقة المعتادة.');
+        }
 
         if (!$order->isManagerReview() || !$order->factory_cost) {
             return back()->with('error', 'يجب أن يكون الطلب في مرحلة مراجعة المدير وأن يحتوي على تكلفة مصنع.');
@@ -119,7 +248,126 @@ class AdminPortalController extends Controller
 
         AuditLog::log('order_approved', $order, $oldValues, $order->toArray());
 
+        if ($order->salesUser) {
+            $this->notifications->send(
+                $order->salesUser,
+                new OrderStatusUpdatedNotification(
+                    $order,
+                    'تم اعتماد الطلب',
+                    sprintf('اعتمد المدير الطلب %s وأصبح جاهزًا للمتابعة التجارية.', $order->order_number),
+                    route('sales.orders.edit', $order),
+                    ['status' => 'approved']
+                )
+            );
+        }
+
+        if ($order->factoryUser) {
+            $this->notifications->send(
+                $order->factoryUser,
+                new OrderStatusUpdatedNotification(
+                    $order,
+                    'تم اعتماد الطلب',
+                    sprintf('اعتمد المدير الطلب %s وتم إغلاق التعديلات التشغيلية عليه.', $order->order_number),
+                    route('factory.orders.edit', $order),
+                    ['status' => 'approved']
+                )
+            );
+        }
+
         return redirect()->route('admin.dashboard')->with('success', 'تم اعتماد الطلب بنجاح.');
+    }
+
+    public function requestOrderAdjustment(Request $request, Order $order)
+    {
+        $order = Order::withoutGlobalScopes()->with(['salesUser', 'factoryUser'])->findOrFail($order->id);
+
+        if (!$order->isManagerReview()) {
+            return back()->with('error', 'يمكن طلب تعديل إضافي فقط للطلبات الموجودة في مرحلة مراجعة المدير.');
+        }
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $oldValues = $order->toArray();
+        $order->update([
+            'status' => 'factory_pricing',
+            'manager_approval' => false,
+        ]);
+
+        AuditLog::log('order_adjustment_requested_by_admin', $order, $oldValues, [
+            'status' => 'factory_pricing',
+            'reason' => $validated['reason'] ?? null,
+        ]);
+
+        if ($order->factoryUser) {
+            $this->notifications->send(
+                $order->factoryUser,
+                new OrderStatusUpdatedNotification(
+                    $order,
+                    'مطلوب تعديل إضافي',
+                    sprintf('طلب المدير تعديلًا إضافيًا على الطلب %s قبل الاعتماد.', $order->order_number),
+                    route('factory.orders.edit', $order),
+                    ['status' => 'factory_pricing', 'reason' => $validated['reason'] ?? null]
+                )
+            );
+        }
+
+        if ($order->salesUser) {
+            $this->notifications->send(
+                $order->salesUser,
+                new OrderStatusUpdatedNotification(
+                    $order,
+                    'الطلب عاد للمراجعة التشغيلية',
+                    sprintf('أعاد المدير الطلب %s لطلب تعديل إضافي قبل الاعتماد.', $order->order_number),
+                    route('sales.orders.edit', $order),
+                    ['status' => 'factory_pricing', 'reason' => $validated['reason'] ?? null]
+                )
+            );
+        }
+
+        return redirect()->route('admin.dashboard')->with('success', 'تمت إعادة الطلب للمصنع لاستكمال التعديل المطلوب.');
+    }
+
+    public function rejectOrder(Request $request, Order $order)
+    {
+        $order = Order::withoutGlobalScopes()->with(['salesUser'])->findOrFail($order->id);
+
+        if (!$order->isManagerReview()) {
+            return back()->with('error', 'يمكن رفض الطلبات الموجودة في مرحلة مراجعة المدير فقط.');
+        }
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $oldValues = $order->toArray();
+        $order->update([
+            'status' => 'draft',
+            'manager_approval' => false,
+            'customer_approval' => false,
+            'payment_confirmed' => false,
+        ]);
+
+        AuditLog::log('order_rejected_by_admin', $order, $oldValues, [
+            'status' => 'draft',
+            'reason' => $validated['reason'] ?? null,
+        ]);
+
+        if ($order->salesUser) {
+            $this->notifications->send(
+                $order->salesUser,
+                new OrderStatusUpdatedNotification(
+                    $order,
+                    'تم رفض الطلب وإعادته للمبيعات',
+                    sprintf('أعاد المدير الطلب %s إلى المبيعات لمراجعته من جديد.', $order->order_number),
+                    route('sales.orders.edit', $order),
+                    ['status' => 'draft', 'reason' => $validated['reason'] ?? null]
+                )
+            );
+        }
+
+        return redirect()->route('admin.dashboard')->with('success', 'تم رفض الطلب وإعادته إلى مرحلة المسودة.');
     }
 
     public function users(Request $request)

@@ -90,14 +90,14 @@ class DatabaseSeeder extends Seeder
 
         $defaultSettings = [
             'default_profit_margin' => '20',
-            'company_name' => 'DAYANCO',
-            'company_address' => '123 Business Street, Commercial District, City, Country',
-            'company_phone' => '+1234567890',
-            'beneficiary_name' => 'DAYANCO TRADING',
-            'beneficiary_bank' => 'International Bank of Commerce',
-            'account_number' => '1234567890123456',
-            'swift_code' => 'IBOCUS33',
-            'bank_address' => '456 Banking Avenue, Financial District, City, Country',
+            'company_name' => 'مؤسسة مدحت رشاد للحلول التقنية',
+            'company_address' => 'يتم تحديد العنوان من لوحة الإعدادات',
+            'company_phone' => '+967000000000',
+            'beneficiary_name' => 'مؤسسة مدحت رشاد للحلول التقنية',
+            'beneficiary_bank' => 'يتم تحديد اسم البنك من لوحة الإعدادات',
+            'account_number' => 'يتم تحديد رقم الحساب من لوحة الإعدادات',
+            'swift_code' => 'يحدد من لوحة الإعدادات',
+            'bank_address' => 'يتم تحديد عنوان البنك من لوحة الإعدادات',
         ];
 
         foreach ($defaultSettings as $key => $value) {

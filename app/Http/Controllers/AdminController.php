@@ -168,7 +168,7 @@ class AdminController extends Controller
             'orders_by_status'     => Order::selectRaw('status, COUNT(*) as count')
                                         ->groupBy('status')->pluck('count', 'status'),
             'total_revenue'        => $totalRevenue,
-            'pending_orders'       => Order::whereIn('status', ['draft','factory_pricing','manager_review'])->count(),
+            'pending_orders'       => Order::whereIn('status', ['draft', 'sent_to_factory', 'factory_pricing', 'manager_review', 'pending_approval'])->count(),
             'completed_orders'     => Order::where('status', 'completed')->count(),
             'total_users'          => User::count(),
             'active_users'         => User::where('is_active', true)->count(),

@@ -6,9 +6,12 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
         <div>
             <h1 class="h3 mb-1">مراجعة الطلب {{ $order->order_number }}</h1>
-            <div class="text-muted">تعديل هامش الربح يدويًا قبل الاعتماد النهائي.</div>
+            <div class="text-muted">الطلب في مرحلة اعتماد الإدارة النهائية بعد استلام بيانات المصنع.</div>
         </div>
-        <a href="{{ route('admin.dashboard') }}" class="btn btn-outline-secondary">رجوع</a>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge-status status-{{ $order->status }}">{{ $order->status_label }}</span>
+            <a href="{{ route('admin.dashboard') }}" class="btn btn-outline-secondary">رجوع</a>
+        </div>
     </div>
 
     <div class="row g-4">
@@ -104,6 +107,22 @@
                         <div class="col-12 d-grid">
                             <button type="submit" class="btn btn-primary btn-lg">اعتماد الطلب نهائيًا</button>
                         </div>
+                    </form>
+
+                    <hr class="my-4">
+
+                    <form method="POST" action="{{ route('admin.orders.request-adjustment', $order) }}" class="mb-3">
+                        @csrf
+                        <label class="form-label">سبب طلب التعديل</label>
+                        <textarea name="reason" rows="3" class="form-control" placeholder="اكتب سبب إعادة الطلب للمصنع أو للفريق المختص..."></textarea>
+                        <button type="submit" class="btn btn-outline-warning w-100 mt-3">طلب تعديل إضافي</button>
+                    </form>
+
+                    <form method="POST" action="{{ route('admin.orders.reject', $order) }}">
+                        @csrf
+                        <label class="form-label">سبب الرفض</label>
+                        <textarea name="reason" rows="3" class="form-control" placeholder="يمكنك توضيح سبب إعادة الطلب للمبيعات..."></textarea>
+                        <button type="submit" class="btn btn-outline-danger w-100 mt-3">رفض وإعادة الطلب</button>
                     </form>
                 </div>
             </div>

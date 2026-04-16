@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>WorkFlow Management System</title>
+    <title>مؤسسة مدحت رشاد للحلول التقنية</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -72,23 +72,23 @@
 <body>
     <div class="container">
         <div class="logo">🏢</div>
-        <h1 class="title">WorkFlow System</h1>
-        <p class="subtitle">Complete Business Management Solution</p>
+        <h1 class="title">مؤسسة مدحت رشاد للحلول التقنية</h1>
+        <p class="subtitle">منصة مؤسسية متكاملة لإدارة سير العمل والاعتمادات والوثائق</p>
         
-        <a href="/login" class="login-btn">🚀 Login to System</a>
+        <a href="/login" class="login-btn">🚀 تسجيل الدخول إلى النظام</a>
         
         <div class="features">
-            <div class="feature">Multi-Role User Management</div>
-            <div class="feature">Order Processing & Tracking</div>
-            <div class="feature">Document Generation (Excel/PDF)</div>
-            <div class="feature">Real-time Analytics Dashboard</div>
-            <div class="feature">Secure File Storage</div>
+            <div class="feature">إدارة المستخدمين حسب الأدوار والصلاحيات</div>
+            <div class="feature">معالجة الطلبات وتتبع مراحل الاعتماد</div>
+            <div class="feature">توليد المستندات الاحترافية بصيغة PDF</div>
+            <div class="feature">إشعارات لحظية ولوحة متابعة مركزية</div>
+            <div class="feature">حفظ آمن للمرفقات والوثائق</div>
         </div>
         
         <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #eee;">
             <small style="color: #999;">
-                Powered by Laravel & React<br>
-                © 2024 WorkFlow Management System
+                مؤسسة مدحت رشاد للحلول التقنية<br>
+                © 2024 نظام إدارة سير العمل المؤسسي
             </small>
         </div>
     </div>

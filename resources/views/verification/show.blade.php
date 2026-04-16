@@ -7,10 +7,10 @@
         <div class="card-body p-5">
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
                 <div>
-                    <div class="display-6 fw-bold text-primary">DAYANCO</div>
-                    <div class="text-muted">Document Verification</div>
+                    <div class="display-6 fw-bold text-primary">مؤسسة مدحت رشاد للحلول التقنية</div>
+                    <div class="text-muted">التحقق من الوثيقة</div>
                 </div>
-                <span class="badge text-bg-success fs-6">Verified</span>
+                <span class="badge text-bg-success fs-6">تم التحقق</span>
             </div>
 
             <div class="row g-4">
@@ -28,7 +28,7 @@
                 <div class="col-md-6">
                     <div class="border rounded-4 p-4 h-100 bg-light-subtle">
                         <div class="text-muted small mb-2">الحالة</div>
-                        <div class="fw-semibold text-capitalize">{{ str_replace('_', ' ', $order->status) }}</div>
+                        <div class="fw-semibold">{{ $order->status_label }}</div>
                         <div class="text-muted small mt-3 mb-2">اسم موظف المبيعات</div>
                         <div>{{ optional($order->salesUser)->name ?: '—' }}</div>
                         <div class="text-muted small mt-3 mb-2">آخر تحديث</div>

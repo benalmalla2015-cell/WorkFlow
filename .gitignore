@@ -10,6 +10,7 @@
 /storage/framework/views
 /storage/logs
 /bootstrap/cache/*.php
+/storage/app/firebase
 .phpunit.result.cache
 .env
 .env.*

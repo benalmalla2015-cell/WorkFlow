@@ -8,6 +8,10 @@ use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Models\User;
+use App\Notifications\OrderStatusUpdatedNotification;
+use App\Services\OrderChangeService;
+use App\Services\UserNotificationService;
 use App\Services\WorkflowDocumentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,14 +19,18 @@ use Illuminate\Validation\ValidationException;
 
 class SalesPortalController extends Controller
 {
-    public function __construct(private WorkflowDocumentService $documents)
+    public function __construct(
+        private WorkflowDocumentService $documents,
+        private OrderChangeService $orderChanges,
+        private UserNotificationService $notifications
+    )
     {
     }
 
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Order::with(['customer', 'attachments.uploadedBy', 'salesUser', 'factoryUser']);
+        $query = Order::with(['customer', 'attachments.uploadedBy', 'salesUser', 'factoryUser', 'items']);
 
         if ($user->isSales()) {
             $query->where('sales_user_id', $user->id);
@@ -62,6 +70,7 @@ class SalesPortalController extends Controller
         $order = null;
 
         DB::transaction(function () use ($request, $validated, &$order) {
+            $orderPayload = $this->buildOrderPayloadFromItems($validated['items']);
             $customer = Customer::updateOrCreate(
                 ['phone' => $validated['customer_phone']],
                 [
@@ -78,14 +87,16 @@ class SalesPortalController extends Controller
             $order = Order::create([
                 'order_number' => 'ORD-' . now()->format('Y') . '-' . str_pad((string) $nextId, 5, '0', STR_PAD_LEFT),
                 'customer_id' => $customer->id,
+                'customer_name' => $customer->full_name,
                 'sales_user_id' => $request->user()->id,
-                'product_name' => $validated['product_name'],
-                'quantity' => $validated['quantity'],
-                'specifications' => $validated['specifications'] ?? null,
+                'product_name' => $orderPayload['product_name'],
+                'quantity' => $orderPayload['quantity'],
+                'specifications' => $orderPayload['specifications'],
                 'customer_notes' => $validated['customer_notes'] ?? null,
                 'status' => 'draft',
             ]);
 
+            $this->syncOrderItems($order, $orderPayload['items']);
             $this->storeAttachments($request, $order, 'sales_upload');
             AuditLog::log('order_created', $order, null, $order->toArray());
         });
@@ -96,7 +107,7 @@ class SalesPortalController extends Controller
     public function edit(Request $request, Order $order)
     {
         $this->authorizeSalesAccess($request, $order);
-        $order->load(['customer', 'attachments.uploadedBy', 'salesUser', 'factoryUser']);
+        $order->load(['customer', 'attachments.uploadedBy', 'salesUser', 'factoryUser', 'items', 'pendingAdjustmentLog.requester']);
 
         return view('sales.orders.form', [
             'order' => $order,
@@ -104,35 +115,134 @@ class SalesPortalController extends Controller
         ]);
     }
 
+    public function createAdjustment(Request $request, Order $order)
+    {
+        $this->authorizeSalesAccess($request, $order);
+        $order->load(['customer', 'attachments.uploadedBy', 'salesUser', 'factoryUser', 'items', 'pendingAdjustmentLog.requester']);
+
+        if ($order->isDraft()) {
+            return redirect()->route('sales.orders.edit', $order)->with('error', 'يمكن تعديل الطلبات المسودة مباشرة دون إنشاء طلب تعديل مستقل.');
+        }
+
+        if ($order->hasPendingChanges()) {
+            return redirect()->route('sales.orders.edit', $order)->with('error', 'يوجد طلب تعديل معلّق بالفعل بانتظار اعتماد المدير.');
+        }
+
+        if (!$request->user()->isAdmin() && !$order->canRequestAdjustmentBy($request->user())) {
+            return redirect()->route('sales.orders.edit', $order)->with('error', 'لا يمكنك إنشاء طلب تعديل على هذا الطلب حالياً.');
+        }
+
+        return view('sales.orders.adjustment-request', [
+            'order' => $order,
+        ]);
+    }
+
+    public function storeAdjustment(Request $request, Order $order)
+    {
+        $this->authorizeSalesAccess($request, $order);
+
+        if ($order->isDraft()) {
+            return redirect()->route('sales.orders.edit', $order)->with('error', 'يمكن تعديل الطلبات المسودة مباشرة دون إنشاء طلب تعديل مستقل.');
+        }
+
+        if ($order->hasPendingChanges()) {
+            return redirect()->route('sales.orders.edit', $order)->with('error', 'يوجد طلب تعديل معلّق بالفعل بانتظار اعتماد المدير.');
+        }
+
+        $validated = $this->validateSalesOrder($request);
+        $orderPayload = $this->buildOrderPayloadFromItems($validated['items']);
+        $changePayload = [
+            'customer' => [
+                'full_name' => $validated['customer_full_name'],
+                'address' => $validated['customer_address'],
+                'phone' => $validated['customer_phone'],
+                'email' => $validated['customer_email'] ?? null,
+            ],
+            'order' => [
+                'customer_name' => $validated['customer_full_name'],
+                'product_name' => $orderPayload['product_name'],
+                'quantity' => $orderPayload['quantity'],
+                'specifications' => $orderPayload['specifications'],
+                'customer_notes' => $validated['customer_notes'] ?? null,
+            ],
+            'items' => $orderPayload['items'],
+        ];
+
+        $stagedAttachments = $this->orderChanges->stageAttachments($request->file('attachments', []), 'sales_upload');
+        $this->orderChanges->submitSalesChangeRequest($order, $request->user(), $changePayload, $stagedAttachments);
+
+        return redirect()->route('sales.orders.edit', $order)->with('success', 'تم إرسال طلب التعديل لاعتماد المدير.');
+    }
+
     public function update(Request $request, Order $order)
     {
         $this->authorizeSalesAccess($request, $order);
+
+        if ($order->hasPendingChanges()) {
+            return back()->with('error', 'يوجد تعديل معلّق بالفعل بانتظار اعتماد المدير.');
+        }
+
+        if (!$request->user()->isAdmin() && !$order->isDraft()) {
+            return redirect()->route('sales.orders.adjustments.create', $order)->with('error', 'تم قفل الحقول الأصلية لهذا الطلب. استخدم نموذج طلب التعديل المنفصل.');
+        }
 
         if (!$order->canBeEditedBy($request->user())) {
             return back()->with('error', 'لا يمكن تعديل الطلب في حالته الحالية.');
         }
 
         $validated = $this->validateSalesOrder($request);
-
-        DB::transaction(function () use ($request, $validated, $order) {
-            $oldValues = $order->toArray();
-
-            $order->customer->update([
+        $orderPayload = $this->buildOrderPayloadFromItems($validated['items']);
+        $changePayload = [
+            'customer' => [
                 'full_name' => $validated['customer_full_name'],
                 'address' => $validated['customer_address'],
                 'phone' => $validated['customer_phone'],
                 'email' => $validated['customer_email'] ?? null,
-            ]);
-
-            $order->update([
-                'product_name' => $validated['product_name'],
-                'quantity' => $validated['quantity'],
-                'specifications' => $validated['specifications'] ?? null,
+            ],
+            'order' => [
+                'customer_name' => $validated['customer_full_name'],
+                'product_name' => $orderPayload['product_name'],
+                'quantity' => $orderPayload['quantity'],
+                'specifications' => $orderPayload['specifications'],
                 'customer_notes' => $validated['customer_notes'] ?? null,
-            ]);
+            ],
+            'items' => $orderPayload['items'],
+        ];
 
+        if ($request->user()->isAdmin()) {
+            DB::transaction(function () use ($request, $order, $changePayload) {
+                $oldValues = $this->salesAuditPayload($order->fresh(['customer', 'items']));
+
+                $order->customer?->update($changePayload['customer']);
+                $order->update($changePayload['order']);
+                $this->syncOrderItems($order, $changePayload['items']);
+                $this->storeAttachments($request, $order, 'sales_upload');
+
+                AuditLog::log(
+                    'order_updated',
+                    $order,
+                    $oldValues,
+                    $this->salesAuditPayload($order->fresh(['customer', 'items']))
+                );
+            });
+
+            return redirect()->route('sales.orders.edit', $order)->with('success', 'تم تحديث الطلب بنجاح.');
+        }
+
+        DB::transaction(function () use ($request, $order, $changePayload) {
+            $oldValues = $this->salesAuditPayload($order->fresh(['customer', 'items']));
+
+            $order->customer?->update($changePayload['customer']);
+            $order->update($changePayload['order']);
+            $this->syncOrderItems($order, $changePayload['items']);
             $this->storeAttachments($request, $order, 'sales_upload');
-            AuditLog::log('order_updated', $order, $oldValues, $order->toArray());
+
+            AuditLog::log(
+                'order_updated',
+                $order,
+                $oldValues,
+                $this->salesAuditPayload($order->fresh(['customer', 'items']))
+            );
         });
 
         return redirect()->route('sales.orders.edit', $order)->with('success', 'تم تحديث الطلب بنجاح.');
@@ -147,8 +257,33 @@ class SalesPortalController extends Controller
         }
 
         $oldStatus = $order->status;
-        $order->update(['status' => 'factory_pricing']);
-        AuditLog::log('status_changed', $order, ['status' => $oldStatus], ['status' => 'factory_pricing']);
+        $order->update(['status' => 'sent_to_factory']);
+        AuditLog::log('status_changed', $order, ['status' => $oldStatus], ['status' => 'sent_to_factory']);
+
+        $admins = User::query()->where('role', 'admin')->where('is_active', true)->get();
+        $factoryUsers = User::query()->where('role', 'factory')->where('is_active', true)->get();
+
+        $this->notifications->send(
+            $admins,
+            new OrderStatusUpdatedNotification(
+                $order,
+                'تم إرسال طلب جديد للمراجعة',
+                sprintf('تم نقل الطلب %s من المبيعات إلى المصنع وهو بانتظار التسعير.', $order->order_number),
+                route('admin.orders.review', $order),
+                ['status' => 'sent_to_factory']
+            )
+        );
+
+        $this->notifications->send(
+            $factoryUsers,
+            new OrderStatusUpdatedNotification(
+                $order,
+                'طلب جديد بانتظار التسعير',
+                sprintf('الطلب %s أصبح متاحًا للمصنع لإعداد التسعير.', $order->order_number),
+                route('factory.orders.edit', $order),
+                ['status' => 'sent_to_factory']
+            )
+        );
 
         return redirect()->route('sales.orders.edit', $order)->with('success', 'تم إرسال الطلب للتسعير من المصنع.');
     }
@@ -240,9 +375,10 @@ class SalesPortalController extends Controller
             'customer_address' => ['required', 'string'],
             'customer_phone' => ['required', 'string', 'max:20'],
             'customer_email' => ['nullable', 'email', 'max:255'],
-            'product_name' => ['required', 'string', 'max:255'],
-            'quantity' => ['required', 'integer', 'min:1'],
-            'specifications' => ['nullable', 'string'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.item_name' => ['required', 'string', 'max:255'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.description' => ['nullable', 'string'],
             'customer_notes' => ['nullable', 'string'],
             'attachments.*' => ['nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'max:10240'],
         ]);
@@ -281,5 +417,62 @@ class SalesPortalController extends Controller
                 'type' => $type,
             ]);
         }
+    }
+
+    private function buildOrderPayloadFromItems(array $items): array
+    {
+        $normalized = [];
+
+        foreach ($items as $item) {
+            $normalized[] = [
+                'item_name' => trim((string) ($item['item_name'] ?? '')),
+                'quantity' => max(1, (int) ($item['quantity'] ?? 1)),
+                'description' => trim((string) ($item['description'] ?? '')),
+            ];
+        }
+
+        $firstItem = $normalized[0];
+        $totalQuantity = array_sum(array_column($normalized, 'quantity'));
+        $summaryLines = array_map(function ($item) {
+            return trim($item['item_name'] . ($item['description'] !== '' ? ' - ' . $item['description'] : ''));
+        }, $normalized);
+
+        return [
+            'items' => $normalized,
+            'product_name' => count($normalized) === 1 ? $firstItem['item_name'] : $firstItem['item_name'] . ' +' . (count($normalized) - 1) . ' items',
+            'quantity' => $totalQuantity,
+            'specifications' => implode(PHP_EOL, $summaryLines),
+        ];
+    }
+
+    private function syncOrderItems(Order $order, array $items): void
+    {
+        $order->items()->delete();
+        $order->items()->createMany($items);
+    }
+
+    private function salesAuditPayload(Order $order): array
+    {
+        return [
+            'customer' => [
+                'full_name' => $order->customer?->full_name,
+                'address' => $order->customer?->address,
+                'phone' => $order->customer?->phone,
+                'email' => $order->customer?->email,
+            ],
+            'order' => [
+                'customer_name' => $order->customer_name,
+                'product_name' => $order->product_name,
+                'quantity' => $order->quantity,
+                'specifications' => $order->specifications,
+                'customer_notes' => $order->customer_notes,
+                'status' => $order->status,
+            ],
+            'items' => $order->resolvedItems()->map(fn ($item) => [
+                'item_name' => $item->item_name,
+                'quantity' => $item->quantity,
+                'description' => $item->description,
+            ])->values()->all(),
+        ];
     }
 }

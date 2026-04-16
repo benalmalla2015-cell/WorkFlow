@@ -7,13 +7,19 @@ use App\Models\Customer;
 use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\Setting;
+use App\Services\WorkflowDocumentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
+    public function __construct(private WorkflowDocumentService $documents)
+    {
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -24,7 +30,7 @@ class OrderController extends Controller
             $query->where('sales_user_id', $user->id);
         } elseif ($user->isFactory()) {
             $query->where(function ($builder) use ($user) {
-                $builder->where('status', 'factory_pricing')
+                $builder->whereIn('status', ['sent_to_factory', 'factory_pricing'])
                         ->orWhere('factory_user_id', $user->id);
             });
         }
@@ -276,7 +282,7 @@ class OrderController extends Controller
         $this->authorizeOrderAccess($order);
 
         $validator = $request->validate([
-            'status' => ['required', Rule::in(['draft', 'factory_pricing', 'manager_review', 'approved', 'customer_approved', 'payment_confirmed', 'completed'])],
+            'status' => ['required', Rule::in(['draft', 'sent_to_factory', 'factory_pricing', 'manager_review', 'pending_approval', 'approved', 'customer_approved', 'payment_confirmed', 'completed'])],
         ]);
 
         $user = $request->user();
@@ -290,8 +296,8 @@ class OrderController extends Controller
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
 
-            if ($order->status !== 'draft' || $request->status !== 'factory_pricing') {
-                return response()->json(['message' => 'Sales users can only submit draft orders to factory pricing'], 422);
+            if ($order->status !== 'draft' || $request->status !== 'sent_to_factory') {
+                return response()->json(['message' => 'Sales users can only submit draft orders to the factory'], 422);
             }
         }
 
@@ -301,6 +307,40 @@ class OrderController extends Controller
         AuditLog::log('status_changed', $order, ['status' => $oldStatus], ['status' => $request->status]);
 
         return response()->json(['message' => 'Status updated successfully']);
+    }
+
+    public function downloadQuotationPdf(Order $order)
+    {
+        $this->authorizeOrderAccess($order);
+
+        try {
+            $document = $this->documents->generateQuotation($order);
+
+            return $this->downloadGeneratedDocument($document['path'], $document['filename']);
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first() ?: 'تعذر توليد عرض السعر بصيغة PDF.';
+
+            return $this->documentErrorResponse($message, 422);
+        } catch (\Throwable $exception) {
+            return $this->documentErrorResponse('تعذر توليد عرض السعر بصيغة PDF: ' . $exception->getMessage(), 500);
+        }
+    }
+
+    public function downloadInvoicePdf(Order $order)
+    {
+        $this->authorizeOrderAccess($order);
+
+        try {
+            $document = $this->documents->generateInvoice($order);
+
+            return $this->downloadGeneratedDocument($document['path'], $document['filename']);
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first() ?: 'تعذر توليد الفاتورة بصيغة PDF.';
+
+            return $this->documentErrorResponse($message, 422);
+        } catch (\Throwable $exception) {
+            return $this->documentErrorResponse('تعذر توليد الفاتورة بصيغة PDF: ' . $exception->getMessage(), 500);
+        }
     }
 
     private function validateOrderRequest($request, $type, $order = null)
@@ -336,13 +376,33 @@ class OrderController extends Controller
 
     private function relationsForUser($user): array
     {
-        $relations = ['salesUser', 'factoryUser', 'attachments.uploadedBy'];
+        $relations = ['salesUser', 'factoryUser', 'attachments.uploadedBy', 'items'];
 
         if (!$user->isFactory()) {
             $relations[] = 'customer';
         }
 
         return $relations;
+    }
+
+    private function downloadGeneratedDocument(string $path, string $downloadName)
+    {
+        $disk = config('workflow.documents_disk', 'public');
+
+        if (!Storage::disk($disk)->exists($path)) {
+            return $this->documentErrorResponse('الملف المولّد غير موجود.', 404);
+        }
+
+        return Storage::disk($disk)->download($path, $downloadName);
+    }
+
+    private function documentErrorResponse(string $message, int $statusCode)
+    {
+        if (request()->expectsJson() || request()->is('api/*')) {
+            return response()->json(['message' => $message], $statusCode);
+        }
+
+        return redirect()->back()->with('error', $message);
     }
 
     private function handleAttachments($request, $order, $type)
@@ -381,7 +441,12 @@ class OrderController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        if ($user->isFactory() && $order->factory_user_id !== $user->id && $order->status !== 'factory_pricing') {
+        if (
+            $user->isFactory()
+            && $order->factory_user_id !== $user->id
+            && $order->pending_change_requested_by !== $user->id
+            && !in_array($order->status, ['sent_to_factory', 'factory_pricing'], true)
+        ) {
             abort(403, 'Unauthorized');
         }
     }

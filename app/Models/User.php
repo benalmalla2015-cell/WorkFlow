@@ -58,6 +58,11 @@ class User extends Authenticatable
         return $this->hasMany(Attachment::class, 'uploaded_by');
     }
 
+    public function notificationTokens()
+    {
+        return $this->hasMany(NotificationToken::class);
+    }
+
     public function auditLogs()
     {
         return $this->hasMany(AuditLog::class);

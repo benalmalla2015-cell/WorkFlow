@@ -48,4 +48,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION'),
     ],
 
+    'firebase' => [
+        'server_key' => env('FIREBASE_SERVER_KEY'),
+        'api_key' => env('FIREBASE_API_KEY'),
+        'project_id' => env('FIREBASE_PROJECT_ID'),
+        'app_id' => env('FIREBASE_APP_ID'),
+        'vapid_key' => env('FIREBASE_VAPID_KEY'),
+    ],
+
 ];
