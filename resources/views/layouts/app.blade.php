@@ -7,8 +7,8 @@
     @php
         $pageTitle = trim($__env->yieldContent('title'));
         $pageTitle = $pageTitle !== ''
-            ? str_replace(' | WorkFlow', '', $pageTitle) . ' | نظام إدارة سير العمل | مؤسسة مدحت رشاد للحلول التقنية'
-            : 'نظام إدارة سير العمل | مؤسسة مدحت رشاد للحلول التقنية';
+            ? str_replace(' | WorkFlow', '', $pageTitle) . ' | نظام إدارة سير العمل | DAYANCO TRADING CO. LIMITED'
+            : 'نظام إدارة سير العمل | DAYANCO TRADING CO. LIMITED';
     @endphp
     <title>{{ $pageTitle }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
@@ -93,7 +93,7 @@
 
     <div class="portal-shell">
         <aside class="portal-sidebar">
-            <div class="portal-brand">مؤسسة مدحت رشاد للحلول التقنية</div>
+            <div class="portal-brand">DAYANCO TRADING CO. LIMITED</div>
             <div class="portal-tagline">نظام إدارة سير العمل المؤسسي</div>
 
             @foreach ($links as $link)
@@ -199,7 +199,7 @@
                 @yield('content')
             </section>
 
-            <footer class="portal-footer">نظام إدارة سير العمل | مؤسسة مدحت رشاد للحلول التقنية</footer>
+            <footer class="portal-footer">نظام إدارة سير العمل | DAYANCO TRADING CO. LIMITED</footer>
         </main>
     </div>
 

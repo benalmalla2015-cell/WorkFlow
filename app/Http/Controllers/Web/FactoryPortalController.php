@@ -84,10 +84,9 @@ class FactoryPortalController extends Controller
             return redirect()->route('factory.orders.edit', $order)->with('error', 'لا يمكنك إنشاء طلب تعديل على هذا الطلب حالياً.');
         }
 
-        return view('factory.orders.adjustment-request', [
-            'order' => $order,
-            'defaultMargin' => (float) Setting::get('default_profit_margin', 20),
-        ]);
+        return redirect()
+            ->route('factory.orders.edit', $order)
+            ->with('open_adjustment_modal', true);
     }
 
     public function storeAdjustment(Request $request, Order $order)
@@ -125,7 +124,10 @@ class FactoryPortalController extends Controller
         }
 
         if (!$request->user()->isAdmin() && $order->status !== 'sent_to_factory') {
-            return redirect()->route('factory.orders.adjustments.create', $order)->with('error', 'تم قفل الحقول الأصلية لهذا الطلب. استخدم نموذج طلب التعديل المنفصل.');
+            return redirect()
+                ->route('factory.orders.edit', $order)
+                ->with('error', 'تم قفل الحقول الأصلية لهذا الطلب. استخدم نموذج طلب التعديل المضمن داخل الصفحة.')
+                ->with('open_adjustment_modal', true);
         }
 
         $validated = $request->validate([

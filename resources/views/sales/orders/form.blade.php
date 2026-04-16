@@ -9,6 +9,7 @@
         && !$canEdit
         && !$order->hasPendingChanges()
         && $order->canRequestAdjustmentBy(auth()->user());
+    $shouldOpenAdjustmentModal = (bool) session('open_adjustment_modal') || old('submission_context') === 'sales_adjustment';
     $lineItems = collect(old('items', $order->resolvedItems()->map(fn ($item) => [
         'item_name' => $item->item_name,
         'quantity' => $item->quantity,
@@ -46,7 +47,7 @@
                 <div>بمجرد إرسال الطلب إلى المصنع لا يمكن تعديل البيانات الأصلية مباشرة، ويجب استخدام مسار طلب تعديل رسمي.</div>
             </div>
             @if ($canRequestAdjustment)
-                <a href="{{ route('sales.orders.adjustments.create', $order) }}" class="btn btn-primary">طلب تعديل</a>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#salesAdjustmentModal">طلب تعديل</button>
             @endif
         </div>
     @endif
@@ -168,44 +169,46 @@
 
     @push('scripts')
         <script>
-            const addRowButton = document.getElementById('add-item-row');
-            const itemsTableBody = document.querySelector('#order-items-table tbody');
+            const bindItemsTable = (options) => {
+                const addRowButton = document.getElementById(options.buttonId);
+                const itemsTableBody = document.querySelector(`#${options.tableId} tbody`);
 
-            const refreshRowIndexes = () => {
                 if (!itemsTableBody) {
                     return;
                 }
 
-                Array.from(itemsTableBody.querySelectorAll('.item-row')).forEach((row, index) => {
-                    const itemName = row.querySelector('[data-field="item_name"]') || row.querySelector('input[name*="[item_name]"]');
-                    const quantity = row.querySelector('[data-field="quantity"]') || row.querySelector('input[name*="[quantity]"]');
-                    const description = row.querySelector('[data-field="description"]') || row.querySelector('textarea[name*="[description]"]');
+                const refreshRowIndexes = () => {
+                    Array.from(itemsTableBody.querySelectorAll('.item-row')).forEach((row, index) => {
+                        const itemName = row.querySelector('[data-field="item_name"]') || row.querySelector('input[name*="[item_name]"]');
+                        const quantity = row.querySelector('[data-field="quantity"]') || row.querySelector('input[name*="[quantity]"]');
+                        const description = row.querySelector('[data-field="description"]') || row.querySelector('textarea[name*="[description]"]');
 
-                    if (itemName) {
-                        itemName.name = `items[${index}][item_name]`;
-                    }
-                    if (quantity) {
-                        quantity.name = `items[${index}][quantity]`;
-                    }
-                    if (description) {
-                        description.name = `items[${index}][description]`;
-                    }
-                });
-            };
+                        if (itemName) {
+                            itemName.name = `items[${index}][item_name]`;
+                        }
+                        if (quantity) {
+                            quantity.name = `items[${index}][quantity]`;
+                        }
+                        if (description) {
+                            description.name = `items[${index}][description]`;
+                        }
+                    });
+                };
 
-            if (addRowButton && itemsTableBody) {
-                addRowButton.addEventListener('click', () => {
-                    const row = document.createElement('tr');
-                    row.className = 'item-row';
-                    row.innerHTML = `
-                        <td><input type="text" data-field="item_name" class="form-control" required></td>
-                        <td><input type="number" min="1" data-field="quantity" class="form-control" value="1" required></td>
-                        <td><textarea data-field="description" rows="2" class="form-control"></textarea></td>
-                        <td><button type="button" class="btn btn-outline-danger btn-sm remove-item-row">حذف</button></td>
-                    `;
-                    itemsTableBody.appendChild(row);
-                    refreshRowIndexes();
-                });
+                if (addRowButton) {
+                    addRowButton.addEventListener('click', () => {
+                        const row = document.createElement('tr');
+                        row.className = 'item-row';
+                        row.innerHTML = `
+                            <td><input type="text" data-field="item_name" class="form-control" required></td>
+                            <td><input type="number" min="1" data-field="quantity" class="form-control" value="1" required></td>
+                            <td><textarea data-field="description" rows="2" class="form-control"></textarea></td>
+                            <td><button type="button" class="btn btn-outline-danger btn-sm remove-item-row">حذف</button></td>
+                        `;
+                        itemsTableBody.appendChild(row);
+                        refreshRowIndexes();
+                    });
+                }
 
                 itemsTableBody.addEventListener('click', (event) => {
                     const trigger = event.target.closest('.remove-item-row');
@@ -222,7 +225,17 @@
                 });
 
                 refreshRowIndexes();
-            }
+            };
+
+            bindItemsTable({ buttonId: 'add-item-row', tableId: 'order-items-table' });
+            bindItemsTable({ buttonId: 'adjustment-add-item-row', tableId: 'adjustment-items-table' });
+
+            @if ($mode === 'edit' && $canRequestAdjustment && $shouldOpenAdjustmentModal)
+                const salesAdjustmentModalElement = document.getElementById('salesAdjustmentModal');
+                if (salesAdjustmentModalElement) {
+                    bootstrap.Modal.getOrCreateInstance(salesAdjustmentModalElement).show();
+                }
+            @endif
         </script>
     @endpush
 
@@ -268,7 +281,7 @@
                         <h2 class="h5 section-title">الإجراءات</h2>
                         <div class="d-flex flex-wrap gap-2">
                             @if ($canRequestAdjustment)
-                                <a href="{{ route('sales.orders.adjustments.create', $order) }}" class="btn btn-outline-primary">طلب تعديل</a>
+                                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#salesAdjustmentModal">طلب تعديل</button>
                             @endif
                             @if ($order->status === 'approved' && !$order->customer_approval)
                                 <form method="POST" action="{{ route('sales.orders.customer-approval', $order) }}">
@@ -298,6 +311,131 @@
                                 <div class="alert alert-success mb-0 w-100">الحالة الحالية: {{ $order->status_label }}.</div>
                             @endif
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($mode === 'edit' && $canRequestAdjustment)
+        <div class="modal fade" id="salesAdjustmentModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header">
+                        <div>
+                            <h2 class="h5 mb-1">طلب تعديل للطلب {{ $order->order_number }}</h2>
+                            <div class="text-muted small">سيتم إرسال التعديلات للمدير للمراجعة والاعتماد قبل تثبيتها على السجل الأصلي.</div>
+                        </div>
+                        <button type="button" class="btn-close ms-0" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form method="POST" action="{{ route('sales.orders.adjustments.store', $order) }}" enctype="multipart/form-data" class="row g-4" id="sales-adjustment-form">
+                            @csrf
+                            <input type="hidden" name="submission_context" value="sales_adjustment">
+
+                            <div class="col-12">
+                                <div class="card form-card">
+                                    <div class="card-body p-4">
+                                        <h3 class="h5 section-title">بيانات العميل المقترحة</h3>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">اسم العميل الكامل</label>
+                                                <input type="text" name="customer_full_name" class="form-control" value="{{ old('customer_full_name', $order->customer?->full_name) }}" required>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">رقم التواصل</label>
+                                                <input type="text" name="customer_phone" class="form-control" value="{{ old('customer_phone', $order->customer?->phone) }}" required>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <label class="form-label">العنوان</label>
+                                                <input type="text" name="customer_address" class="form-control" value="{{ old('customer_address', $order->customer?->address) }}" required>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">البريد الإلكتروني</label>
+                                                <input type="email" name="customer_email" class="form-control" value="{{ old('customer_email', $order->customer?->email) }}">
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label">ملاحظات الطلب</label>
+                                                <textarea name="customer_notes" rows="3" class="form-control">{{ old('customer_notes', $order->customer_notes) }}</textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="card form-card">
+                                    <div class="card-body p-4">
+                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                            <h3 class="h5 section-title mb-0">العناصر المقترحة</h3>
+                                            <button type="button" class="btn btn-outline-primary btn-sm" id="adjustment-add-item-row">إضافة صف</button>
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table align-middle" id="adjustment-items-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="min-width: 220px;">اسم العنصر</th>
+                                                        <th style="width: 140px;">الكمية</th>
+                                                        <th>الوصف</th>
+                                                        <th style="width: 90px;">إجراء</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($lineItems as $index => $item)
+                                                        <tr class="item-row">
+                                                            <td>
+                                                                <input type="text" name="items[{{ $index }}][item_name]" class="form-control" value="{{ $item['item_name'] ?? '' }}" required>
+                                                            </td>
+                                                            <td>
+                                                                <input type="number" min="1" name="items[{{ $index }}][quantity]" class="form-control" value="{{ $item['quantity'] ?? 1 }}" required>
+                                                            </td>
+                                                            <td>
+                                                                <textarea name="items[{{ $index }}][description]" rows="2" class="form-control">{{ $item['description'] ?? '' }}</textarea>
+                                                            </td>
+                                                            <td>
+                                                                <button type="button" class="btn btn-outline-danger btn-sm remove-item-row">حذف</button>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-6">
+                                <div class="card form-card h-100">
+                                    <div class="card-body p-4">
+                                        <h3 class="h5 section-title">مرفقات إضافية مع طلب التعديل</h3>
+                                        <input type="file" name="attachments[]" class="form-control" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png">
+                                        <div class="form-text">يمكنك إرفاق ملفات داعمة أو صور أو نسخة محدثة من المرجع.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-6">
+                                <div class="card form-card h-100">
+                                    <div class="card-body p-4">
+                                        <h3 class="h5 section-title">المرفقات الحالية</h3>
+                                        <div class="attachment-list list-group list-group-flush">
+                                            @forelse ($order->attachments->where('type', 'sales_upload') as $attachment)
+                                                <a href="{{ route('attachments.download', $attachment) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                                    <span>{{ $attachment->original_name }}</span>
+                                                    <span class="text-muted small">{{ strtoupper(pathinfo($attachment->original_name, PATHINFO_EXTENSION)) }}</span>
+                                                </a>
+                                            @empty
+                                                <div class="text-muted">لا توجد مرفقات حالية.</div>
+                                            @endforelse
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" form="sales-adjustment-form" class="btn btn-primary">إرسال طلب التعديل للاعتماد</button>
                     </div>
                 </div>
             </div>

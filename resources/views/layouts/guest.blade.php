@@ -7,8 +7,8 @@
     @php
         $pageTitle = trim($__env->yieldContent('title'));
         $pageTitle = $pageTitle !== ''
-            ? str_replace(' | WorkFlow', '', $pageTitle) . ' | نظام إدارة سير العمل | مؤسسة مدحت رشاد للحلول التقنية'
-            : 'نظام إدارة سير العمل | مؤسسة مدحت رشاد للحلول التقنية';
+            ? str_replace(' | WorkFlow', '', $pageTitle) . ' | نظام إدارة سير العمل | DAYANCO TRADING CO. LIMITED'
+            : 'نظام إدارة سير العمل | DAYANCO TRADING CO. LIMITED';
     @endphp
     <title>{{ $pageTitle }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
@@ -23,7 +23,7 @@
 <body>
     <div class="guest-wrap">
         @yield('content')
-        <div class="guest-footer">نظام إدارة سير العمل | مؤسسة مدحت رشاد للحلول التقنية</div>
+        <div class="guest-footer">نظام إدارة سير العمل | DAYANCO TRADING CO. LIMITED</div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     @stack('scripts')

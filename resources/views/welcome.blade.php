@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>مؤسسة مدحت رشاد للحلول التقنية</title>
+    <title>DAYANCO TRADING CO. LIMITED</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -72,7 +72,7 @@
 <body>
     <div class="container">
         <div class="logo">🏢</div>
-        <h1 class="title">مؤسسة مدحت رشاد للحلول التقنية</h1>
+        <h1 class="title">DAYANCO TRADING CO. LIMITED</h1>
         <p class="subtitle">منصة مؤسسية متكاملة لإدارة سير العمل والاعتمادات والوثائق</p>
         
         <a href="/login" class="login-btn">🚀 تسجيل الدخول إلى النظام</a>
@@ -87,7 +87,7 @@
         
         <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #eee;">
             <small style="color: #999;">
-                مؤسسة مدحت رشاد للحلول التقنية<br>
+                DAYANCO TRADING CO. LIMITED<br>
                 © 2024 نظام إدارة سير العمل المؤسسي
             </small>
         </div>

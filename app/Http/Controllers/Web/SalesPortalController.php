@@ -132,9 +132,9 @@ class SalesPortalController extends Controller
             return redirect()->route('sales.orders.edit', $order)->with('error', 'لا يمكنك إنشاء طلب تعديل على هذا الطلب حالياً.');
         }
 
-        return view('sales.orders.adjustment-request', [
-            'order' => $order,
-        ]);
+        return redirect()
+            ->route('sales.orders.edit', $order)
+            ->with('open_adjustment_modal', true);
     }
 
     public function storeAdjustment(Request $request, Order $order)
@@ -183,7 +183,10 @@ class SalesPortalController extends Controller
         }
 
         if (!$request->user()->isAdmin() && !$order->isDraft()) {
-            return redirect()->route('sales.orders.adjustments.create', $order)->with('error', 'تم قفل الحقول الأصلية لهذا الطلب. استخدم نموذج طلب التعديل المنفصل.');
+            return redirect()
+                ->route('sales.orders.edit', $order)
+                ->with('error', 'تم قفل الحقول الأصلية لهذا الطلب. استخدم نموذج طلب التعديل المضمن داخل الصفحة.')
+                ->with('open_adjustment_modal', true);
         }
 
         if (!$order->canBeEditedBy($request->user())) {
