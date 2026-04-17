@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\Setting;
+use App\Services\OrderPricingService;
 use App\Services\WorkflowDocumentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -16,7 +17,10 @@ use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
-    public function __construct(private WorkflowDocumentService $documents)
+    public function __construct(
+        private WorkflowDocumentService $documents,
+        private OrderPricingService $pricing
+    )
     {
     }
 
@@ -90,6 +94,12 @@ class OrderController extends Controller
                 'status' => 'draft',
             ]);
 
+            $this->syncApiSingleItem($order, [
+                'item_name' => $request->product_name,
+                'quantity' => $request->quantity,
+                'description' => $request->specifications,
+            ]);
+
             // Handle attachments
             if ($request->has('attachments')) {
                 $this->handleAttachments($request, $order, 'sales_upload');
@@ -133,6 +143,19 @@ class OrderController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        if ($request->user()->isFactory()) {
+            $expectedIds = $order->items()->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $submittedIds = collect($request->input('items', []))->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+            if ($expectedIds !== $submittedIds) {
+                return response()->json([
+                    'errors' => [
+                        'items' => ['يجب تسعير جميع عناصر الطلب الحالية قبل إرسال الطلب إلى مراجعة المدير.'],
+                    ],
+                ], 422);
+            }
+        }
+
         try {
             DB::beginTransaction();
 
@@ -154,23 +177,40 @@ class OrderController extends Controller
                     'specifications' => $request->specifications,
                 ];
             } elseif ($request->user()->isFactory()) {
-                $updateData = [
-                    'supplier_name' => $request->supplier_name,
-                    'product_code' => $request->product_code,
-                    'factory_cost' => $request->factory_cost,
-                    'production_days' => $request->production_days,
-                    'factory_user_id' => $request->user()->id,
-                    'status' => 'manager_review',
-                ];
+                $items = $order->items()->get()->keyBy('id');
+                foreach ($request->input('items', []) as $itemData) {
+                    $item = $items->get((int) ($itemData['id'] ?? 0));
 
-                // Calculate selling price with default profit margin
-                $defaultMargin = Setting::get('default_profit_margin', 20);
-                $sellingPrice = $request->factory_cost * (1 + $defaultMargin / 100);
-                $updateData['selling_price'] = $sellingPrice;
-                $updateData['profit_margin_percentage'] = $defaultMargin;
+                    if (!$item) {
+                        continue;
+                    }
+
+                    $item->update([
+                        'supplier_name' => $itemData['supplier_name'],
+                        'product_code' => $itemData['product_code'],
+                        'unit_cost' => $itemData['unit_cost'],
+                    ]);
+                }
+
+                $order->production_days = $request->production_days;
+                $order->factory_user_id = $request->user()->id;
+                $order->status = 'manager_review';
+                $order->manager_approval = false;
+                $this->pricing->syncOrderPricing($order, (float) Setting::get('default_profit_margin', 20));
+                $order->save();
             }
 
-            $order->update($updateData);
+            if ($updateData !== []) {
+                $order->update($updateData);
+
+                if ($request->user()->isSales()) {
+                    $this->syncApiSingleItem($order, [
+                        'item_name' => $request->product_name,
+                        'quantity' => $request->quantity,
+                        'description' => $request->specifications,
+                    ]);
+                }
+            }
 
             // Handle new attachments
             if ($request->has('attachments')) {
@@ -199,8 +239,10 @@ class OrderController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if (!$order->isManagerReview() || !$order->factory_cost) {
-            return response()->json(['message' => 'Order must have factory pricing before approval'], 400);
+        $order->loadMissing('items');
+
+        if (!$order->isManagerReview() || !$order->hasCompleteFactoryItemPricing() || !$order->production_days) {
+            return response()->json(['message' => 'Order must have complete factory pricing for every item before approval'], 400);
         }
 
         $validator = $request->validate([
@@ -209,18 +251,18 @@ class OrderController extends Controller
 
         try {
             $oldValues = $order->toArray();
-
-            $quantity = max(1, (int) ($order->quantity ?: 1));
-            $sellingPrice = (float) $order->factory_cost * (1 + ((float) $request->profit_margin_percentage / 100));
-            $totalPrice = round($sellingPrice * $quantity, 2);
-            $netProfit = round(($sellingPrice - (float) $order->factory_cost) * $quantity, 2);
+            $order->profit_margin_percentage = (float) $request->profit_margin_percentage;
+            $summary = $this->pricing->syncOrderPricing($order, (float) $request->profit_margin_percentage);
 
             $order->update([
                 'profit_margin_percentage' => $request->profit_margin_percentage,
-                'selling_price' => $sellingPrice,
-                'final_price' => $totalPrice,
-                'total_price' => $totalPrice,
-                'net_profit' => $netProfit,
+                'supplier_name' => $summary['supplier_name'],
+                'product_code' => $summary['product_code'],
+                'factory_cost' => $summary['factory_cost_average'],
+                'selling_price' => $summary['sales_unit_price_average'],
+                'final_price' => $summary['sales_total'],
+                'total_price' => $summary['sales_total'],
+                'net_profit' => $summary['net_profit'],
                 'status' => 'approved',
                 'manager_approval' => true,
             ]);
@@ -317,6 +359,10 @@ class OrderController extends Controller
     {
         $this->authorizeOrderAccess($order);
 
+        if (!$order->canGenerateCommercialDocuments()) {
+            return $this->documentErrorResponse('لا يمكن توليد عرض السعر قبل اعتماد المدير للطلب.', 422);
+        }
+
         try {
             $document = $this->documents->generateQuotation($order);
 
@@ -333,6 +379,10 @@ class OrderController extends Controller
     public function downloadInvoicePdf(Order $order)
     {
         $this->authorizeOrderAccess($order);
+
+        if (!$order->canGenerateCommercialDocuments()) {
+            return $this->documentErrorResponse('لا يمكن توليد الفاتورة قبل اعتماد المدير للطلب.', 422);
+        }
 
         try {
             $document = $this->documents->generateInvoice($order);
@@ -367,10 +417,12 @@ class OrderController extends Controller
         }
 
         if ($request->user()->isFactory()) {
-            $rules['supplier_name'] = 'required|string|max:255';
-            $rules['product_code'] = 'required|string|max:100';
-            $rules['factory_cost'] = 'required|numeric|min:0';
             $rules['production_days'] = 'required|integer|min:1';
+            $rules['items'] = 'required|array|min:1';
+            $rules['items.*.id'] = 'required|integer';
+            $rules['items.*.supplier_name'] = 'required|string|max:255';
+            $rules['items.*.product_code'] = 'required|string|max:100';
+            $rules['items.*.unit_cost'] = 'required|numeric|min:0.01';
         }
 
         $rules['attachments.*'] = 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240';
@@ -407,6 +459,16 @@ class OrderController extends Controller
         }
 
         return redirect()->back()->with('error', $message);
+    }
+
+    private function syncApiSingleItem(Order $order, array $item): void
+    {
+        $order->items()->delete();
+        $order->items()->create([
+            'item_name' => $item['item_name'] ?? $order->product_name,
+            'quantity' => max(1, (int) ($item['quantity'] ?? $order->quantity ?: 1)),
+            'description' => $item['description'] ?? $order->specifications,
+        ]);
     }
 
     private function handleAttachments($request, $order, $type)

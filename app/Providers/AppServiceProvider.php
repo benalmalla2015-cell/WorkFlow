@@ -2,11 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\Setting;
+use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
-use Illuminate\Pagination\Paginator;
-use App\Models\Setting;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,20 +25,22 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Set default string length for MySQL
         Schema::defaultStringLength(191);
-
         Paginator::useBootstrapFive();
 
-        // Share settings with all views (safely)
+        if ($this->app->isProduction() && str_starts_with((string) config('app.url'), 'https://')) {
+            URL::forceScheme('https');
+        }
+
         View::composer('*', function ($view) {
             try {
-                $settings = \Illuminate\Support\Facades\Cache::remember('app_settings', 300, function () {
-                    return \App\Models\Setting::pluck('value', 'key')->toArray();
+                $settings = Cache::remember('app_settings', 300, function () {
+                    return Setting::pluck('value', 'key')->toArray();
                 });
             } catch (\Exception $e) {
                 $settings = [];
             }
+
             $view->with('settings', $settings);
         });
     }

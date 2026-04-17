@@ -248,9 +248,9 @@
                         tag: data.tag || payload.tag || '',
                         orderId: data.order_id || payload.order_id || '',
                         shouldPlaySound: Boolean(payload.should_play_sound)
-                            || ['adjustment_request', 'new_order'].includes(soundEvent)
-                            || ['order_change_requested', 'adjustment_requested', 'new_order'].includes(type)
-                            || /طلب تعديل|طلب جديد/.test(searchableText),
+                            || ['adjustment_request', 'new_order', 'sales_update'].includes(soundEvent)
+                            || ['order_change_requested', 'adjustment_requested', 'new_order', 'sales_update'].includes(type)
+                            || /طلب تعديل|طلب جديد|تحديث من المبيعات|طلب تعديل من المبيعات/.test(searchableText),
                     };
                 };
 

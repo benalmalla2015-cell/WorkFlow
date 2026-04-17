@@ -76,7 +76,6 @@
                             <th>النموذج</th>
                             <th>المعرف</th>
                             <th>الملخص العربي</th>
-                            <th>الحقول المتغيرة</th>
                             <th>IP</th>
                             <th>تفاصيل</th>
                         </tr>
@@ -121,17 +120,6 @@
                                 <td>
                                     <div class="small">{{ $log->humanSummary() }}</div>
                                 </td>
-                                <td>
-                                    @if ($changedFields->isNotEmpty())
-                                        <div class="d-flex flex-wrap gap-1">
-                                            @foreach ($changedFields as $field)
-                                                <span class="badge text-bg-light border">{{ $field }}</span>
-                                            @endforeach
-                                        </div>
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
                                 <td>{{ $log->ip_address ?: '—' }}</td>
                                 <td>
                                     <details>
@@ -168,7 +156,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="text-center py-5 text-muted">لا توجد سجلات.</td>
+                                <td colspan="8" class="text-center py-5 text-muted">لا توجد سجلات.</td>
                             </tr>
                         @endforelse
                     </tbody>

@@ -9,6 +9,7 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Notifications\OrderStatusUpdatedNotification;
 use App\Services\OrderChangeService;
+use App\Services\OrderPricingService;
 use App\Services\UserNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -20,6 +21,7 @@ class AdminPortalController extends Controller
 {
     public function __construct(
         private OrderChangeService $orderChanges,
+        private OrderPricingService $pricing,
         private UserNotificationService $notifications
     )
     {
@@ -87,6 +89,7 @@ class AdminPortalController extends Controller
         return view('admin.orders.review', [
             'order' => $order,
             'defaultMargin' => (float) Setting::get('default_profit_margin', 20),
+            'pricingSummary' => $this->pricing->summarize($order),
         ]);
     }
 
@@ -177,6 +180,10 @@ class AdminPortalController extends Controller
 
         $oldValues = $order->toArray();
         $stage = $validated['workflow_stage'];
+        if (in_array($stage, ['ready', 'completed'], true) && (!$order->hasCompleteFactoryItemPricing() || !$order->production_days)) {
+            return back()->with('error', 'لا يمكن نقل الطلب إلى جاهز أو مكتمل قبل اكتمال تسعير جميع العناصر واعتماد مدة الإنتاج.');
+        }
+
         $processingStatus = $order->factory_cost ? 'factory_pricing' : 'sent_to_factory';
         $updates = match ($stage) {
             'new' => [
@@ -219,7 +226,7 @@ class AdminPortalController extends Controller
 
     public function approveOrder(Request $request, Order $order)
     {
-        $order = Order::withoutGlobalScopes()->with(['salesUser', 'factoryUser'])->findOrFail($order->id);
+        $order = Order::withoutGlobalScopes()->with(['salesUser', 'factoryUser', 'items'])->findOrFail($order->id);
 
         if ($order->hasPendingChanges() || $order->isPendingApproval()) {
             return redirect()
@@ -227,8 +234,8 @@ class AdminPortalController extends Controller
                 ->with('error', 'يوجد طلب تعديل معلّق يجب مراجعته أولاً قبل اعتماد الطلب بالطريقة المعتادة.');
         }
 
-        if (!$order->isManagerReview() || !$order->factory_cost) {
-            return back()->with('error', 'يجب أن يكون الطلب في مرحلة مراجعة المدير وأن يحتوي على تكلفة مصنع.');
+        if (!$order->isManagerReview() || !$order->hasCompleteFactoryItemPricing() || !$order->production_days) {
+            return back()->with('error', 'لا يمكن اعتماد الطلب قبل أن يُكمل المصنع تسعير جميع العناصر ومدة الإنتاج.');
         }
 
         $validated = $request->validate([
@@ -236,17 +243,18 @@ class AdminPortalController extends Controller
         ]);
 
         $oldValues = $order->toArray();
-        $quantity = max(1, (int) ($order->quantity ?: 1));
-        $sellingPrice = (float) $order->factory_cost * (1 + ((float) $validated['profit_margin_percentage'] / 100));
-        $totalPrice = round($sellingPrice * $quantity, 2);
-        $netProfit = round(($sellingPrice - (float) $order->factory_cost) * $quantity, 2);
+        $order->profit_margin_percentage = (float) $validated['profit_margin_percentage'];
+        $summary = $this->pricing->syncOrderPricing($order, (float) $validated['profit_margin_percentage']);
 
         $order->update([
             'profit_margin_percentage' => $validated['profit_margin_percentage'],
-            'selling_price' => $sellingPrice,
-            'final_price' => $totalPrice,
-            'total_price' => $totalPrice,
-            'net_profit' => $netProfit,
+            'supplier_name' => $summary['supplier_name'],
+            'product_code' => $summary['product_code'],
+            'factory_cost' => $summary['factory_cost_average'],
+            'selling_price' => $summary['sales_unit_price_average'],
+            'final_price' => $summary['sales_total'],
+            'total_price' => $summary['sales_total'],
+            'net_profit' => $summary['net_profit'],
             'status' => 'approved',
             'manager_approval' => true,
         ]);

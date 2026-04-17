@@ -2,6 +2,10 @@
 
 @section('title', 'مراجعة الطلب | WorkFlow')
 
+@php
+    $pricingComplete = $order->hasCompleteFactoryItemPricing() && $order->production_days;
+@endphp
+
 @section('content')
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
         <div>
@@ -84,28 +88,55 @@
                 <div class="card-body p-4">
                     <h2 class="h5 section-title">الهامش والاعتماد</h2>
                     <div class="border rounded-4 p-3 bg-light mb-4">
-                        <div class="text-muted small">اسم المورد</div>
-                        <div class="fw-semibold">{{ $order->supplier_name ?: '—' }}</div>
-                        <div class="text-muted small mt-3">كود المنتج</div>
-                        <div>{{ $order->product_code ?: '—' }}</div>
-                        <div class="text-muted small mt-3">تكلفة المصنع</div>
-                        <div class="fw-semibold text-danger">${{ number_format((float) $order->factory_cost, 2) }}</div>
+                        <div class="text-muted small">عدد العناصر المسعّرة</div>
+                        <div class="fw-semibold">{{ count($pricingSummary['line_items'] ?? []) }}</div>
+                        <div class="text-muted small mt-3">إجمالي تكلفة المصنع</div>
+                        <div class="fw-semibold text-danger">${{ number_format((float) ($pricingSummary['total_factory_cost'] ?? 0), 2) }}</div>
                         <div class="text-muted small mt-3">مدة الإنتاج</div>
                         <div>{{ $order->production_days ?: '—' }} يوم</div>
                     </div>
+
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>العنصر</th>
+                                    <th>الكمية</th>
+                                    <th>المورد</th>
+                                    <th>الكود</th>
+                                    <th>سعر الوحدة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (($pricingSummary['line_items'] ?? []) as $item)
+                                    <tr>
+                                        <td>{{ $item['item_name'] }}</td>
+                                        <td>{{ number_format((int) $item['quantity']) }}</td>
+                                        <td>{{ $item['supplier_name'] ?: '—' }}</td>
+                                        <td>{{ $item['product_code'] ?: '—' }}</td>
+                                        <td>${{ number_format((float) $item['unit_cost'], 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @unless ($pricingComplete)
+                        <div class="alert alert-warning border-0 shadow-sm">لا يمكن اعتماد الطلب قبل تعبئة المورد وكود المنتج وسعر الوحدة لكل عنصر، مع تحديد مدة الإنتاج.</div>
+                    @endunless
 
                     <form method="POST" action="{{ route('admin.orders.approve', $order) }}" class="row g-3">
                         @csrf
                         <div class="col-12">
                             <label class="form-label">هامش الربح (%)</label>
-                            <input type="number" min="0" max="500" step="0.01" name="profit_margin_percentage" id="profit_margin_percentage" class="form-control form-control-lg" value="{{ old('profit_margin_percentage', $defaultMargin) }}" required>
+                            <input type="number" min="0" max="500" step="0.01" name="profit_margin_percentage" id="profit_margin_percentage" class="form-control form-control-lg" value="{{ old('profit_margin_percentage', $defaultMargin) }}" @disabled(!$pricingComplete) required>
                         </div>
                         <div class="col-12">
                             <label class="form-label">السعر النهائي المتوقع</label>
-                            <input type="text" id="final_price_preview" class="form-control form-control-lg" value="${{ number_format((float) $order->factory_cost * (1 + ($defaultMargin / 100)), 2) }}" disabled>
+                            <input type="text" id="final_price_preview" class="form-control form-control-lg" value="${{ number_format((float) (($pricingSummary['sales_total'] ?? 0) > 0 ? $pricingSummary['sales_total'] : 0), 2) }}" disabled>
                         </div>
                         <div class="col-12 d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">اعتماد الطلب نهائيًا</button>
+                            <button type="submit" class="btn btn-primary btn-lg" @disabled(!$pricingComplete)>اعتماد الطلب نهائيًا</button>
                         </div>
                     </form>
 
@@ -134,12 +165,12 @@
     <script>
         const marginInput = document.getElementById('profit_margin_percentage');
         const preview = document.getElementById('final_price_preview');
-        const factoryCost = {{ (float) $order->factory_cost }};
+        const totalFactoryCost = {{ (float) ($pricingSummary['total_factory_cost'] ?? 0) }};
 
         if (marginInput && preview) {
             const recalculate = () => {
                 const margin = parseFloat(marginInput.value || 0);
-                const total = factoryCost * (1 + (margin / 100));
+                const total = totalFactoryCost * (1 + (margin / 100));
                 preview.value = `$${total.toFixed(2)}`;
             };
 

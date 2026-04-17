@@ -31,9 +31,9 @@ const normalizePayload = function (payload) {
 const shouldPlayBell = function (payload) {
     const searchableText = (payload.title || '') + ' ' + (payload.message || '');
 
-    return ['adjustment_request', 'new_order'].includes(payload.sound_event)
-        || ['order_change_requested', 'adjustment_requested', 'new_order'].includes(payload.type)
-        || /طلب تعديل|طلب جديد/.test(searchableText);
+    return ['adjustment_request', 'new_order', 'sales_update'].includes(payload.sound_event)
+        || ['order_change_requested', 'adjustment_requested', 'new_order', 'sales_update'].includes(payload.type)
+        || /طلب تعديل|طلب جديد|تحديث من المبيعات|طلب تعديل من المبيعات/.test(searchableText);
 };
 
 const notifyClients = function (payload) {

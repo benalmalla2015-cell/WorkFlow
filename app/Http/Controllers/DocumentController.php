@@ -19,8 +19,10 @@ class DocumentController extends Controller
     {
         $this->authorizeOrderDocumentAccess($order);
 
-        if (!$order->isApproved() && !$order->isCustomerApproved() && !$order->isPaymentConfirmed() && !$order->isCompleted()) {
-            return response()->json(['message' => 'Order must be approved to generate quotation'], 400);
+        if (!$order->canGenerateCommercialDocuments()) {
+            return response()->json([
+                'message' => 'لا يمكن توليد عرض السعر قبل اعتماد المدير للطلب.',
+            ], 422);
         }
 
         try {
@@ -43,8 +45,10 @@ class DocumentController extends Controller
     {
         $this->authorizeOrderDocumentAccess($order);
 
-        if (!$order->payment_confirmed && !$order->isCompleted()) {
-            return response()->json(['message' => 'Order payment must be confirmed before generating invoice'], 400);
+        if (!$order->canGenerateCommercialDocuments()) {
+            return response()->json([
+                'message' => 'لا يمكن توليد الفاتورة قبل اعتماد المدير للطلب.',
+            ], 422);
         }
 
         try {

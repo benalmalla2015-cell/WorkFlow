@@ -18,6 +18,15 @@
     $showFactoryGuidance = auth()->user()?->isFactory();
     $canRequestAdjustment = !$canEdit && !$order->hasPendingChanges() && $order->canRequestAdjustmentBy(auth()->user());
     $shouldOpenAdjustmentModal = (bool) session('open_adjustment_modal') || old('submission_context') === 'factory_adjustment';
+    $factoryItems = collect(old('items', $order->resolvedItems()->map(fn ($item) => [
+        'id' => $item->id,
+        'item_name' => $item->item_name,
+        'quantity' => $item->quantity,
+        'description' => $item->description,
+        'supplier_name' => $item->supplier_name,
+        'product_code' => $item->product_code,
+        'unit_cost' => $item->unit_cost,
+    ])->values()->all()));
 @endphp
 
 @section('content')
@@ -68,6 +77,10 @@
                         <dd class="col-sm-8">{{ number_format($order->quantity) }} PCS</dd>
                         <dt class="col-sm-4">المواصفات</dt>
                         <dd class="col-sm-8">{{ $order->specifications ?: '—' }}</dd>
+                        <dt class="col-sm-4">عدد العناصر</dt>
+                        <dd class="col-sm-8">{{ $factoryItems->count() }}</dd>
+                        <dt class="col-sm-4">إجمالي تكلفة المصنع الحالية</dt>
+                        <dd class="col-sm-8">{{ number_format((float) ($pricingSummary['total_factory_cost'] ?? 0), 2) }} USD</dd>
                     </dl>
                 </div>
             </div>
@@ -96,20 +109,44 @@
 
                 <div class="card form-card mb-4">
                     <div class="card-body p-4">
-                        <h2 class="h5 section-title">بيانات المورد والتكلفة</h2>
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">اسم المورد</label>
-                                <input type="text" name="supplier_name" class="form-control" value="{{ old('supplier_name', $order->supplier_name) }}" @readonly(!$canEdit) required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">كود المنتج</label>
-                                <input type="text" name="product_code" class="form-control" value="{{ old('product_code', $order->product_code) }}" @readonly(!$canEdit) required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">تكلفة المصنع USD</label>
-                                <input type="number" step="0.01" min="0" name="factory_cost" class="form-control" value="{{ old('factory_cost', $order->factory_cost) }}" @readonly(!$canEdit) required>
-                            </div>
+                        <h2 class="h5 section-title">تسعير عناصر الطلب</h2>
+                        <div class="alert alert-light border mb-3">يجب تعبئة المورد وكود المنتج وسعر الوحدة لكل عنصر قبل الإرسال إلى مراجعة المدير.</div>
+                        <div class="table-responsive">
+                            <table class="table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 18%;">العنصر</th>
+                                        <th style="width: 10%;">الكمية</th>
+                                        <th>الوصف</th>
+                                        <th style="width: 18%;">اسم المورد</th>
+                                        <th style="width: 16%;">كود المنتج</th>
+                                        <th style="width: 16%;">سعر الوحدة USD</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($factoryItems as $index => $item)
+                                        <tr>
+                                            <td>
+                                                <input type="hidden" name="items[{{ $index }}][id]" value="{{ $item['id'] ?? '' }}">
+                                                <div class="fw-semibold">{{ $item['item_name'] ?? '—' }}</div>
+                                            </td>
+                                            <td>{{ number_format((int) ($item['quantity'] ?? 1)) }}</td>
+                                            <td>{{ $item['description'] ?? '—' }}</td>
+                                            <td>
+                                                <input type="text" name="items[{{ $index }}][supplier_name]" class="form-control" value="{{ $item['supplier_name'] ?? '' }}" @readonly(!$canEdit) required>
+                                            </td>
+                                            <td>
+                                                <input type="text" name="items[{{ $index }}][product_code]" class="form-control" value="{{ $item['product_code'] ?? '' }}" @readonly(!$canEdit) required>
+                                            </td>
+                                            <td>
+                                                <input type="number" step="0.01" min="0.01" name="items[{{ $index }}][unit_cost]" class="form-control" value="{{ $item['unit_cost'] ?? '' }}" @readonly(!$canEdit) required>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="row g-3 mt-2">
                             <div class="col-md-6">
                                 <label class="form-label">مدة الإنتاج بالأيام</label>
                                 <input type="number" min="1" name="production_days" class="form-control" value="{{ old('production_days', $order->production_days) }}" @readonly(!$canEdit) required>
@@ -176,20 +213,43 @@
 
                             <div class="card form-card mb-4">
                                 <div class="card-body p-4">
-                                    <h3 class="h5 section-title">بيانات المورد المقترحة</h3>
-                                    <div class="row g-3">
-                                        <div class="col-md-6">
-                                            <label class="form-label">اسم المورد</label>
-                                            <input type="text" name="supplier_name" class="form-control" value="{{ old('supplier_name', $order->supplier_name) }}" required>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">كود المنتج</label>
-                                            <input type="text" name="product_code" class="form-control" value="{{ old('product_code', $order->product_code) }}" required>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">تكلفة المصنع USD</label>
-                                            <input type="number" step="0.01" min="0" name="factory_cost" class="form-control" value="{{ old('factory_cost', $order->factory_cost) }}" required>
-                                        </div>
+                                    <h3 class="h5 section-title">بيانات العناصر المقترحة</h3>
+                                    <div class="table-responsive">
+                                        <table class="table align-middle">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 18%;">العنصر</th>
+                                                    <th style="width: 10%;">الكمية</th>
+                                                    <th>الوصف</th>
+                                                    <th style="width: 18%;">اسم المورد</th>
+                                                    <th style="width: 16%;">كود المنتج</th>
+                                                    <th style="width: 16%;">سعر الوحدة USD</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($factoryItems as $index => $item)
+                                                    <tr>
+                                                        <td>
+                                                            <input type="hidden" name="items[{{ $index }}][id]" value="{{ $item['id'] ?? '' }}">
+                                                            <div class="fw-semibold">{{ $item['item_name'] ?? '—' }}</div>
+                                                        </td>
+                                                        <td>{{ number_format((int) ($item['quantity'] ?? 1)) }}</td>
+                                                        <td>{{ $item['description'] ?? '—' }}</td>
+                                                        <td>
+                                                            <input type="text" name="items[{{ $index }}][supplier_name]" class="form-control" value="{{ $item['supplier_name'] ?? '' }}" required>
+                                                        </td>
+                                                        <td>
+                                                            <input type="text" name="items[{{ $index }}][product_code]" class="form-control" value="{{ $item['product_code'] ?? '' }}" required>
+                                                        </td>
+                                                        <td>
+                                                            <input type="number" step="0.01" min="0.01" name="items[{{ $index }}][unit_cost]" class="form-control" value="{{ $item['unit_cost'] ?? '' }}" required>
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="row g-3 mt-2">
                                         <div class="col-md-6">
                                             <label class="form-label">مدة الإنتاج بالأيام</label>
                                             <input type="number" min="1" name="production_days" class="form-control" value="{{ old('production_days', $order->production_days) }}" required>

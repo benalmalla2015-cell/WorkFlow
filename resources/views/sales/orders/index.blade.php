@@ -74,6 +74,9 @@
                     </thead>
                     <tbody>
                         @forelse ($orders as $order)
+                            @php
+                                $documentsEnabled = $order->canGenerateCommercialDocuments();
+                            @endphp
                             <tr>
                                 <td class="fw-semibold">{{ $order->order_number }}</td>
                                 <td>{{ optional($order->customer)->full_name ?: '—' }}</td>
@@ -101,11 +104,13 @@
                                         @if (!$order->isDraft() && !$order->hasPendingChanges() && $order->canRequestAdjustmentBy(auth()->user()))
                                             <a href="{{ route('sales.orders.adjustments.create', $order) }}" class="btn btn-sm btn-outline-primary">طلب تعديل</a>
                                         @endif
-                                        @if ($order->status === 'approved')
+                                        @if ($documentsEnabled)
                                             <form method="POST" action="{{ route('sales.orders.quotation.generate', $order) }}">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-outline-success">توليد عرض سعر PDF</button>
                                             </form>
+                                        @else
+                                            <button type="button" class="btn btn-sm btn-outline-success" disabled>توليد عرض سعر PDF</button>
                                         @endif
                                         @if ($order->quotation_path)
                                             <a href="{{ route('sales.orders.quotation.download', $order) }}" class="btn btn-sm btn-outline-success">تحميل عرض السعر PDF</a>
@@ -122,11 +127,13 @@
                                                 <button type="submit" class="btn btn-sm btn-outline-warning">تأكيد الدفع</button>
                                             </form>
                                         @endif
-                                        @if ($order->payment_confirmed || $order->status === 'completed')
+                                        @if ($documentsEnabled)
                                             <form method="POST" action="{{ route('sales.orders.invoice.generate', $order) }}">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">توليد فاتورة PDF</button>
                                             </form>
+                                        @else
+                                            <button type="button" class="btn btn-sm btn-outline-danger" disabled>توليد فاتورة PDF</button>
                                         @endif
                                         @if ($order->invoice_path)
                                             <a href="{{ route('sales.orders.invoice.download', $order) }}" class="btn btn-sm btn-outline-danger">تحميل الفاتورة PDF</a>

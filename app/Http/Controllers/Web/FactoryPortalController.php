@@ -10,14 +10,17 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Notifications\OrderStatusUpdatedNotification;
 use App\Services\OrderChangeService;
+use App\Services\OrderPricingService;
 use App\Services\UserNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class FactoryPortalController extends Controller
 {
     public function __construct(
         private OrderChangeService $orderChanges,
+        private OrderPricingService $pricing,
         private UserNotificationService $notifications
     )
     {
@@ -64,6 +67,7 @@ class FactoryPortalController extends Controller
         return view('factory.orders.form', [
             'order' => $order,
             'defaultMargin' => (float) Setting::get('default_profit_margin', 20),
+            'pricingSummary' => $this->pricing->summarize($order),
         ]);
     }
 
@@ -101,13 +105,7 @@ class FactoryPortalController extends Controller
             return redirect()->route('factory.orders.edit', $order)->with('error', 'يوجد طلب تعديل معلّق بالفعل بانتظار اعتماد المدير.');
         }
 
-        $validated = $request->validate([
-            'supplier_name' => ['required', 'string', 'max:255'],
-            'product_code' => ['required', 'string', 'max:100'],
-            'factory_cost' => ['required', 'numeric', 'min:0'],
-            'production_days' => ['required', 'integer', 'min:1'],
-            'attachments.*' => ['nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'max:10240'],
-        ]);
+        $validated = $this->validateFactoryPricingRequest($request, $order);
 
         $stagedAttachments = $this->orderChanges->stageAttachments($request->file('attachments', []), 'factory_upload');
         $this->orderChanges->submitFactoryChangeRequest($order, $request->user(), $validated, $stagedAttachments);
@@ -130,56 +128,26 @@ class FactoryPortalController extends Controller
                 ->with('open_adjustment_modal', true);
         }
 
-        $validated = $request->validate([
-            'supplier_name' => ['required', 'string', 'max:255'],
-            'product_code' => ['required', 'string', 'max:100'],
-            'factory_cost' => ['required', 'numeric', 'min:0'],
-            'production_days' => ['required', 'integer', 'min:1'],
-            'attachments.*' => ['nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'max:10240'],
-        ]);
+        $validated = $this->validateFactoryPricingRequest($request, $order);
 
         if ($request->user()->isAdmin()) {
             DB::transaction(function () use ($request, $order, $validated) {
-                $oldValues = $this->factoryAuditPayload($order->fresh());
-                $defaultMargin = (float) Setting::get('default_profit_margin', 20);
-                $sellingPrice = (float) $validated['factory_cost'] * (1 + ($defaultMargin / 100));
-
-                $order->update([
-                    'supplier_name' => $validated['supplier_name'],
-                    'product_code' => $validated['product_code'],
-                    'factory_cost' => $validated['factory_cost'],
-                    'production_days' => $validated['production_days'],
-                    'factory_user_id' => $request->user()->id,
-                    'selling_price' => $sellingPrice,
-                    'profit_margin_percentage' => $defaultMargin,
-                    'status' => 'manager_review',
-                ]);
+                $oldValues = $this->factoryAuditPayload($order->fresh(['items']));
+                $this->syncFactoryPricingData($order, $validated, $request->user()->id);
 
                 $this->storeAttachments($request, $order);
-                AuditLog::log('order_updated', $order, $oldValues, $this->factoryAuditPayload($order->fresh()));
+                AuditLog::log('order_updated', $order, $oldValues, $this->factoryAuditPayload($order->fresh(['items'])));
             });
 
             return redirect()->route('factory.orders.index')->with('success', 'تم تحديث بيانات المصنع بنجاح.');
         }
 
         DB::transaction(function () use ($request, $order, $validated) {
-            $oldValues = $this->factoryAuditPayload($order->fresh());
-            $defaultMargin = (float) Setting::get('default_profit_margin', 20);
-            $sellingPrice = (float) $validated['factory_cost'] * (1 + ($defaultMargin / 100));
-
-            $order->update([
-                'supplier_name' => $validated['supplier_name'],
-                'product_code' => $validated['product_code'],
-                'factory_cost' => $validated['factory_cost'],
-                'production_days' => $validated['production_days'],
-                'factory_user_id' => $request->user()->id,
-                'selling_price' => $sellingPrice,
-                'profit_margin_percentage' => $defaultMargin,
-                'status' => 'manager_review',
-            ]);
+            $oldValues = $this->factoryAuditPayload($order->fresh(['items']));
+            $this->syncFactoryPricingData($order, $validated, $request->user()->id);
 
             $this->storeAttachments($request, $order);
-            AuditLog::log('order_updated', $order, $oldValues, $this->factoryAuditPayload($order->fresh()));
+            AuditLog::log('order_updated', $order, $oldValues, $this->factoryAuditPayload($order->fresh(['items'])));
         });
 
         $admins = User::query()->where('role', 'admin')->where('is_active', true)->get();
@@ -248,6 +216,56 @@ class FactoryPortalController extends Controller
         }
     }
 
+    private function validateFactoryPricingRequest(Request $request, Order $order): array
+    {
+        $validated = $request->validate([
+            'production_days' => ['required', 'integer', 'min:1'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.id' => ['required', 'integer'],
+            'items.*.supplier_name' => ['required', 'string', 'max:255'],
+            'items.*.product_code' => ['required', 'string', 'max:100'],
+            'items.*.unit_cost' => ['required', 'numeric', 'min:0.01'],
+            'attachments.*' => ['nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'max:10240'],
+        ]);
+
+        $expectedIds = $order->items()->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+        $submittedIds = collect($validated['items'])->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+        if ($expectedIds !== $submittedIds) {
+            throw ValidationException::withMessages([
+                'items' => 'يجب تسعير جميع عناصر الطلب الحالية قبل الإرسال إلى مراجعة المدير.',
+            ]);
+        }
+
+        return $validated;
+    }
+
+    private function syncFactoryPricingData(Order $order, array $validated, int $factoryUserId): void
+    {
+        $items = $order->items()->get()->keyBy('id');
+
+        foreach ($validated['items'] as $itemData) {
+            $item = $items->get((int) $itemData['id']);
+
+            if (!$item) {
+                continue;
+            }
+
+            $item->update([
+                'supplier_name' => $itemData['supplier_name'],
+                'product_code' => $itemData['product_code'],
+                'unit_cost' => $itemData['unit_cost'],
+            ]);
+        }
+
+        $order->production_days = $validated['production_days'];
+        $order->factory_user_id = $factoryUserId;
+        $order->status = 'manager_review';
+        $order->manager_approval = false;
+        $this->pricing->syncOrderPricing($order, (float) Setting::get('default_profit_margin', 20));
+        $order->save();
+    }
+
     private function factoryAuditPayload(Order $order): array
     {
         return [
@@ -261,6 +279,14 @@ class FactoryPortalController extends Controller
                 'status' => $order->status,
                 'factory_user_id' => $order->factory_user_id,
             ],
+            'items' => $order->resolvedItems()->map(fn ($item) => [
+                'id' => $item->id,
+                'item_name' => $item->item_name,
+                'quantity' => $item->quantity,
+                'supplier_name' => $item->supplier_name,
+                'product_code' => $item->product_code,
+                'unit_cost' => $item->unit_cost,
+            ])->values()->all(),
         ];
     }
 }

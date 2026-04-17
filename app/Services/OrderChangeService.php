@@ -17,7 +17,10 @@ use Illuminate\Support\Facades\Storage;
 
 class OrderChangeService
 {
-    public function __construct(private UserNotificationService $notifications)
+    public function __construct(
+        private UserNotificationService $notifications,
+        private OrderPricingService $pricing
+    )
     {
     }
 
@@ -78,12 +81,10 @@ class OrderChangeService
         $snapshot = $this->snapshotOrder($order->fresh(['customer', 'items', 'attachments']));
         $proposed = [
             'order' => [
-                'supplier_name' => $payload['supplier_name'],
-                'product_code' => $payload['product_code'],
-                'factory_cost' => $payload['factory_cost'],
                 'production_days' => $payload['production_days'],
                 'factory_user_id' => $requester->id,
             ],
+            'items' => $payload['items'],
             'attachments' => $stagedAttachments,
         ];
 
@@ -144,6 +145,7 @@ class OrderChangeService
             $type = $adjustmentLog?->type ?? ($pendingChanges['type'] ?? null);
             $proposed = $adjustmentLog?->proposed_payload ?? ($pendingChanges['proposed'] ?? []);
             $requesterId = (int) ($adjustmentLog?->requester_id ?: data_get($pendingChanges, 'requested_by.id'));
+            $resolvedStatus = $adjustmentLog?->target_status ?? ($pendingChanges['target_status'] ?? ($order->pending_change_original_status ?: 'draft'));
 
             if ($type === 'sales_edit') {
                 $customerData = $proposed['customer'] ?? [];
@@ -165,28 +167,46 @@ class OrderChangeService
 
                 $order->items()->delete();
                 $order->items()->createMany($proposed['items'] ?? []);
+                $order->supplier_name = null;
+                $order->product_code = null;
+                $order->factory_cost = null;
+                $order->selling_price = null;
+                $order->final_price = null;
+                $order->total_price = null;
+                $order->net_profit = null;
+                $order->manager_approval = false;
+                $order->quotation_path = null;
+                $order->invoice_path = null;
+                $resolvedStatus = $order->factory_user_id ? 'factory_pricing' : 'sent_to_factory';
             }
 
             if ($type === 'factory_edit') {
                 $factoryData = Arr::only($proposed['order'] ?? [], [
-                    'supplier_name',
-                    'product_code',
-                    'factory_cost',
                     'production_days',
                     'factory_user_id',
                 ]);
 
-                $defaultMargin = (float) Setting::get('default_profit_margin', 20);
-                $factoryCost = (float) ($factoryData['factory_cost'] ?? 0);
-                $sellingPrice = $factoryCost > 0 ? $factoryCost * (1 + ($defaultMargin / 100)) : null;
+                $items = $order->items()->get()->keyBy('id');
+                foreach ($proposed['items'] ?? [] as $itemData) {
+                    $item = $items->get((int) ($itemData['id'] ?? 0));
+
+                    if (!$item) {
+                        continue;
+                    }
+
+                    $item->update([
+                        'supplier_name' => $itemData['supplier_name'] ?? null,
+                        'product_code' => $itemData['product_code'] ?? null,
+                        'unit_cost' => $itemData['unit_cost'] ?? null,
+                    ]);
+                }
 
                 $order->fill($factoryData);
-                $order->selling_price = $sellingPrice;
-                $order->profit_margin_percentage = $defaultMargin;
                 $order->manager_approval = false;
+                $this->pricing->syncOrderPricing($order, (float) Setting::get('default_profit_margin', 20));
             }
 
-            $order->status = $adjustmentLog?->target_status ?? ($pendingChanges['target_status'] ?? ($order->pending_change_original_status ?: 'draft'));
+            $order->status = $resolvedStatus;
             $order->pending_changes = null;
             $order->pending_change_requested_by = null;
             $order->pending_change_requested_at = null;
@@ -345,6 +365,12 @@ class OrderChangeService
 
     private function syncFinancialValues(Order $order): void
     {
+        if ($this->pricing->hasCompleteFactoryItemPricing($order)) {
+            $this->pricing->syncOrderPricing($order, (float) ($order->profit_margin_percentage ?: Setting::get('default_profit_margin', 20)));
+
+            return;
+        }
+
         $quantity = max(1, (int) ($order->quantity ?: 1));
         $factoryCost = (float) ($order->factory_cost ?: 0);
         $sellingPrice = (float) ($order->selling_price ?: 0);
@@ -462,6 +488,9 @@ class OrderChangeService
                 'item_name' => $item->item_name,
                 'quantity' => $item->quantity,
                 'description' => $item->description,
+                'supplier_name' => $item->supplier_name,
+                'product_code' => $item->product_code,
+                'unit_cost' => $item->unit_cost,
             ])->values()->all(),
         ];
     }

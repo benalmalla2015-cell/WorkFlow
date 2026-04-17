@@ -291,8 +291,40 @@ class Order extends Model
                 'item_name' => $this->product_name,
                 'quantity' => $this->quantity,
                 'description' => $this->specifications,
+                'supplier_name' => $this->supplier_name,
+                'product_code' => $this->product_code,
+                'unit_cost' => $this->factory_cost,
             ]),
         ])->filter(fn ($item) => filled($item->item_name));
+    }
+
+    public function isManagerApproved(): bool
+    {
+        if ($this->manager_approval !== null) {
+            return (bool) $this->manager_approval;
+        }
+
+        return in_array($this->status, ['approved', 'customer_approved', 'payment_confirmed', 'completed'], true);
+    }
+
+    public function canGenerateCommercialDocuments(): bool
+    {
+        return $this->isManagerApproved() && $this->hasCompleteFactoryItemPricing();
+    }
+
+    public function hasCompleteFactoryItemPricing(): bool
+    {
+        $items = $this->resolvedItems();
+
+        if ($items->isEmpty()) {
+            return false;
+        }
+
+        return $items->every(function ($item) {
+            return filled($item->supplier_name)
+                && filled($item->product_code)
+                && (float) ($item->unit_cost ?: 0) > 0;
+        });
     }
 
     public function isDraft()

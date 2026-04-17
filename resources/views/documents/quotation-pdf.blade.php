@@ -6,39 +6,41 @@
     <style>
         body {
             font-family: DejaVu Sans, sans-serif;
-            color: #172033;
+            color: #1e293b;
             font-size: 11px;
             margin: 0;
-            padding: 24px 28px;
+            padding: 18px 22px;
             direction: rtl;
         }
-        .header { width: 100%; border-bottom: 3px solid #0f172a; padding-bottom: 14px; margin-bottom: 18px; }
-        .brand { font-size: 30px; font-weight: 900; color: #0f172a; letter-spacing: 2px; }
-        .brand-sub { font-size: 10px; color: #64748b; margin-top: 2px; }
-        .brand-ar { font-size: 12px; color: #334155; margin-top: 4px; font-weight: 700; }
-        .company-meta { font-size: 9px; color: #475569; margin-top: 8px; line-height: 1.7; }
-        .title { text-align: center; font-size: 22px; font-weight: 900; margin: 16px 0; padding: 8px 0; border-top: 2px solid #e2e8f0; border-bottom: 2px solid #e2e8f0; color: #0f172a; }
-        .title small { display: block; margin-top: 6px; font-size: 13px; color: #64748b; }
-        .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-        .meta-table td { padding: 8px 10px; border: 1px solid #e2e8f0; background: #f8fafc; vertical-align: top; }
-        .meta-label { font-weight: 700; color: #334155; }
-        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-        .items-table th { background: #0f172a; color: #fff; padding: 8px 6px; font-size: 10px; text-align: center; }
-        .items-table td { border: 1px solid #cbd5e1; padding: 7px 6px; font-size: 10px; text-align: center; vertical-align: top; }
+        .header { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+        .brand-block { width: 64%; vertical-align: top; }
+        .doc-block { width: 36%; vertical-align: top; text-align: left; }
+        .brand { font-size: 28px; font-weight: 900; color: #0f172a; letter-spacing: 1px; }
+        .brand-sub { font-size: 10px; color: #475569; margin-top: 3px; }
+        .brand-ar { font-size: 12px; font-weight: 700; margin-top: 5px; }
+        .company-meta, .doc-meta { font-size: 9px; color: #475569; line-height: 1.8; }
+        .doc-card { border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 12px 14px; }
+        .doc-name { font-size: 20px; font-weight: 900; color: #0f172a; margin-bottom: 8px; }
+        .section { border: 1px solid #dbe2ea; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; background: #f8fafc; }
+        .section-title { font-size: 12px; font-weight: 800; margin-bottom: 8px; color: #0f172a; }
+        .customer-table, .items-table, .summary-table { width: 100%; border-collapse: collapse; }
+        .customer-table td { padding: 4px 0; vertical-align: top; }
+        .label { width: 22%; color: #64748b; font-weight: 700; }
+        .items-table { margin-bottom: 14px; }
+        .items-table th { background: #0f172a; color: #fff; padding: 9px 7px; font-size: 10px; text-align: center; }
+        .items-table td { border: 1px solid #dbe2ea; padding: 8px 7px; font-size: 10px; text-align: center; vertical-align: top; }
         .items-table tbody tr:nth-child(even) { background: #f8fafc; }
-        .total-row td { font-weight: 700; background: #e2e8f0; }
-        .summary { width: 48%; margin-right: auto; border: 2px solid #0f172a; border-radius: 8px; padding: 10px; }
-        .summary table { width: 100%; border-collapse: collapse; }
-        .summary td { padding: 5px 6px; font-size: 11px; }
-        .summary .grand { border-top: 2px solid #0f172a; font-weight: 900; color: #0f172a; font-size: 14px; }
-        .notes { margin-top: 20px; padding: 12px; border: 1px solid #94a3b8; border-radius: 8px; font-size: 10px; color: #475569; line-height: 1.8; }
-        .footer { margin-top: 24px; text-align: center; font-size: 9px; color: #64748b; border-top: 2px solid #0f172a; padding-top: 10px; }
+        .summary-wrap { width: 42%; margin-right: auto; }
+        .summary-table td { border: 1px solid #dbe2ea; padding: 7px 10px; font-size: 10px; }
+        .summary-table .grand td { background: #0f172a; color: #fff; font-weight: 800; }
+        .notes { margin-top: 18px; border: 1px dashed #94a3b8; border-radius: 12px; padding: 10px 12px; font-size: 9px; line-height: 1.9; color: #475569; }
+        .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #64748b; border-top: 1px solid #cbd5e1; padding-top: 10px; }
     </style>
 </head>
 <body>
     <table class="header">
         <tr>
-            <td style="width: 60%; vertical-align: top;">
+            <td class="brand-block">
                 <div class="brand">DAYANCO®</div>
                 <div class="brand-sub">TRADING CO. LIMITED | Supply Chain Management</div>
                 <div class="brand-ar">شركة ديانكو التجارية المحدودة</div>
@@ -47,45 +49,47 @@
                     ATTN: {{ $company['attn'] ?: 'Mr. Abdulmalek' }} | {{ $company['phone'] ?: '+86 188188 45411' }} | {{ $company['email'] ?: 'team@dayancoofficial.com' }}
                 </div>
             </td>
-            <td style="width: 40%; text-align: left; vertical-align: top;">
-                <div class="meta-label">عرض سعر / QUOTATION</div>
-                <div class="company-meta">
-                    <strong>رقم العرض:</strong> {{ $order->order_number }}<br>
-                    <strong>تاريخ الإصدار:</strong> {{ $generatedAt->format('Y-m-d') }}<br>
-                    <strong>صالح حتى:</strong> {{ $generatedAt->copy()->addDays(21)->format('Y-m-d') }}
+            <td class="doc-block">
+                <div class="doc-card">
+                    <div class="doc-name">QUOTATION</div>
+                    <div class="doc-meta">
+                        <strong>رقم العرض:</strong> {{ $order->order_number }}<br>
+                        <strong>التاريخ:</strong> {{ $generatedAt->format('Y-m-d') }}<br>
+                        <strong>صالح حتى:</strong> {{ $generatedAt->copy()->addDays(21)->format('Y-m-d') }}<br>
+                        <strong>العملة:</strong> {{ $totals['currency'] }}
+                    </div>
                 </div>
             </td>
         </tr>
     </table>
 
-    <div class="title">
-        QUOTATION - عرض سعر
-        <small>{{ $order->product_name ?: 'المنتج' }}</small>
+    <div class="section">
+        <div class="section-title">بيانات العميل</div>
+        <table class="customer-table">
+            <tr>
+                <td class="label">العميل</td>
+                <td>{{ $order->resolvedCustomerName() ?: 'غير محدد' }}</td>
+            </tr>
+            <tr>
+                <td class="label">مرجع الطلب</td>
+                <td>{{ $order->order_number }}</td>
+            </tr>
+            <tr>
+                <td class="label">مدة الإنتاج</td>
+                <td>{{ $order->production_days ?: '—' }} يوم</td>
+            </tr>
+        </table>
     </div>
-
-    <table class="meta-table">
-        <tr>
-            <td style="width: 50%;">
-                <span class="meta-label">العميل / TO:</span><br>
-                {{ $order->resolvedCustomerName() ?: 'غير محدد' }}
-            </td>
-            <td style="width: 50%;">
-                <span class="meta-label">مدة الإنتاج:</span> {{ $order->production_days ?: '15' }} يوم<br>
-                <span class="meta-label">العملة:</span> {{ $totals['currency'] }}
-            </td>
-        </tr>
-    </table>
 
     <table class="items-table">
         <thead>
             <tr>
                 <th style="width: 6%;">#</th>
-                <th style="width: 28%;">المنتج / Item</th>
-                <th style="width: 24%;">الوصف / Description</th>
-                <th style="width: 10%;">الكمية / Qty</th>
-                <th style="width: 14%;">سعر الوحدة / Unit Price</th>
-                <th style="width: 12%;">الإجمالي / Subtotal</th>
-                <th style="width: 6%;">المدة</th>
+                <th style="width: 28%;">الصنف / Item</th>
+                <th>الوصف / Description</th>
+                <th style="width: 12%;">الكمية / Qty</th>
+                <th style="width: 16%;">سعر البيع / Sales Price</th>
+                <th style="width: 18%;">الإجمالي / Total</th>
             </tr>
         </thead>
         <tbody>
@@ -95,34 +99,26 @@
                     <td style="text-align: right;">{{ $item['item_name'] }}</td>
                     <td style="text-align: right;">{{ $item['description'] }}</td>
                     <td>{{ number_format($item['quantity']) }}</td>
-                    <td>{{ $totals['currency'] }} {{ number_format((float) $totals['unit_price'], 2) }}</td>
-                    <td>{{ $totals['currency'] }} {{ number_format((float) $totals['unit_price'] * (float) $item['quantity'], 2) }}</td>
-                    <td>{{ $order->production_days ?: '15' }}</td>
+                    <td>{{ $totals['currency'] }} {{ number_format((float) $item['sales_price'], 2) }}</td>
+                    <td>{{ $totals['currency'] }} {{ number_format((float) $item['line_total'], 2) }}</td>
                 </tr>
             @endforeach
-            <tr class="total-row">
-                <td colspan="3" style="text-align: right;">الإجمالي / Total</td>
-                <td>{{ number_format($totals['quantity']) }}</td>
-                <td>{{ $totals['currency'] }} {{ number_format((float) $totals['unit_price'], 2) }}</td>
-                <td>{{ $totals['currency'] }} {{ number_format((float) $totals['subtotal'], 2) }}</td>
-                <td></td>
-            </tr>
         </tbody>
     </table>
 
-    <div class="summary">
-        <table>
+    <div class="summary-wrap">
+        <table class="summary-table">
             <tr>
-                <td class="meta-label">الإجمالي قبل الضريبة</td>
+                <td>الإجمالي قبل الضريبة</td>
                 <td style="text-align: left;">{{ $totals['currency'] }} {{ number_format((float) $totals['subtotal'], 2) }}</td>
             </tr>
             <tr>
-                <td class="meta-label">الضريبة</td>
+                <td>الضريبة</td>
                 <td style="text-align: left;">{{ number_format((float) $totals['tax_rate'], 2) }}% ({{ $totals['currency'] }} {{ number_format((float) $totals['tax_amount'], 2) }})</td>
             </tr>
-            <tr>
-                <td class="grand">الإجمالي النهائي</td>
-                <td class="grand" style="text-align: left;">{{ $totals['currency'] }} {{ number_format((float) $totals['grand_total'], 2) }}</td>
+            <tr class="grand">
+                <td>الإجمالي النهائي</td>
+                <td style="text-align: left;">{{ $totals['currency'] }} {{ number_format((float) $totals['grand_total'], 2) }}</td>
             </tr>
         </table>
     </div>

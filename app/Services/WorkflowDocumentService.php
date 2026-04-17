@@ -7,13 +7,26 @@ use App\Models\Order;
 use App\Models\Setting;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\View;
 use Illuminate\Validation\ValidationException;
+use Mpdf\Mpdf;
 
 class WorkflowDocumentService
 {
+    public function __construct(private OrderPricingService $pricing)
+    {
+    }
+
     public function generateQuotation(Order $order): array
     {
         $order = $this->loadOrder($order);
+
+        if (!$order->canGenerateCommercialDocuments()) {
+            throw ValidationException::withMessages([
+                'order' => 'لا يمكن توليد المستندات التجارية قبل اعتماد المدير للطلب.',
+            ]);
+        }
+
         $items = $this->resolveItems($order);
 
         if ($items === []) {
@@ -36,6 +49,13 @@ class WorkflowDocumentService
     public function generateInvoice(Order $order): array
     {
         $order = $this->loadOrder($order);
+
+        if (!$order->canGenerateCommercialDocuments()) {
+            throw ValidationException::withMessages([
+                'order' => 'لا يمكن توليد المستندات التجارية قبل اعتماد المدير للطلب.',
+            ]);
+        }
+
         $items = $this->resolveItems($order);
 
         if ($items === []) {
@@ -74,12 +94,14 @@ class WorkflowDocumentService
 
     private function resolveItems(Order $order): array
     {
-        return $order->resolvedItems()
+        return collect($this->pricing->summarize($order)['line_items'] ?? [])
             ->map(function ($item) {
                 return [
-                    'item_name' => (string) ($item->item_name ?? ''),
-                    'quantity' => max(1, (int) ($item->quantity ?? 1)),
-                    'description' => (string) ($item->description ?? ''),
+                    'item_name' => (string) ($item['item_name'] ?? ''),
+                    'quantity' => max(1, (int) ($item['quantity'] ?? 1)),
+                    'description' => (string) ($item['description'] ?? ''),
+                    'sales_price' => round((float) ($item['sales_price'] ?? 0), 2),
+                    'line_total' => round((float) ($item['sales_total'] ?? 0), 2),
                 ];
             })
             ->filter(fn ($item) => $item['item_name'] !== '')
@@ -109,19 +131,16 @@ class WorkflowDocumentService
 
         $this->ensureDirectory($disk, $root);
 
-        $pdf = Pdf::setOption([
-            'isRemoteEnabled' => true,
-            'defaultFont' => 'DejaVu Sans',
-        ])->loadView($view, [
+        $payload = [
             'order' => $order,
             'items' => $items,
             'company' => $this->companyProfile(),
             'generatedAt' => now(),
             'verificationUrl' => $this->verificationUrl($order),
             'totals' => $this->resolveTotals($order, $items),
-        ])->setPaper('a4', 'portrait');
+        ];
 
-        Storage::disk($disk)->put($relativePath, $pdf->output());
+        Storage::disk($disk)->put($relativePath, $this->renderPdf($view, $payload));
 
         $order->update([$pathField => $relativePath]);
         AuditLog::log($auditAction, $order);
@@ -152,7 +171,7 @@ class WorkflowDocumentService
     private function resolveTotals(Order $order, array $items): array
     {
         $totalQuantity = array_sum(array_column($items, 'quantity'));
-        $subtotal = (float) ($order->total_price ?: $order->final_price ?: 0);
+        $subtotal = round((float) array_sum(array_column($items, 'line_total')), 2);
         $unitPrice = $totalQuantity > 0 && $subtotal > 0 ? $subtotal / $totalQuantity : 0;
         $taxRate = (float) Setting::get('tax_rate', 0);
         $taxAmount = round($subtotal * ($taxRate / 100), 2);
@@ -166,10 +185,39 @@ class WorkflowDocumentService
             'tax_amount' => $taxAmount,
             'total' => $grandTotal,
             'grand_total' => $grandTotal,
-            'factory_cost' => round((float) ($order->factory_cost ?: 0), 2),
-            'profit_margin' => round((float) ($order->profit_margin_percentage ?: 0), 2),
-            'net_profit' => round((float) ($order->net_profit ?: 0), 2),
             'currency' => (string) Setting::get('currency', 'USD'),
         ];
+    }
+
+    private function renderPdf(string $view, array $payload): string
+    {
+        $html = View::make($view, $payload)->render();
+
+        if (class_exists(Mpdf::class)) {
+            $tempDir = storage_path('app/mpdf-temp');
+            if (!is_dir($tempDir)) {
+                @mkdir($tempDir, 0775, true);
+            }
+
+            $mpdf = new Mpdf([
+                'mode' => 'utf-8',
+                'format' => 'A4',
+                'margin_top' => 10,
+                'margin_bottom' => 10,
+                'margin_left' => 8,
+                'margin_right' => 8,
+                'tempDir' => $tempDir,
+                'default_font' => 'dejavusans',
+            ]);
+            $mpdf->SetDirectionality('rtl');
+            $mpdf->WriteHTML($html);
+
+            return $mpdf->Output('', 'S');
+        }
+
+        return Pdf::setOption([
+            'isRemoteEnabled' => true,
+            'defaultFont' => 'DejaVu Sans',
+        ])->loadHTML($html)->setPaper('a4', 'portrait')->output();
     }
 }

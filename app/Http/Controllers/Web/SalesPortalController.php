@@ -101,6 +101,12 @@ class SalesPortalController extends Controller
             AuditLog::log('order_created', $order, null, $order->toArray());
         });
 
+        $this->notifyStakeholdersAboutSalesActivity(
+            $order->fresh(['items']),
+            'طلب جديد من المبيعات',
+            sprintf('قام قسم المبيعات بإنشاء الطلب %s وحفظه في النظام.', $order->order_number)
+        );
+
         return redirect()->route('sales.orders.edit', $order)->with('success', 'تم إنشاء الطلب بنجاح.');
     }
 
@@ -170,6 +176,13 @@ class SalesPortalController extends Controller
 
         $stagedAttachments = $this->orderChanges->stageAttachments($request->file('attachments', []), 'sales_upload');
         $this->orderChanges->submitSalesChangeRequest($order, $request->user(), $changePayload, $stagedAttachments);
+        $this->notifyStakeholdersAboutSalesActivity(
+            $order->fresh(['items']),
+            'طلب تعديل من المبيعات',
+            sprintf('أرسل قسم المبيعات طلب تعديل على الطلب %s ويحتاج لمتابعة تشغيلية.', $order->order_number),
+            false,
+            true
+        );
 
         return redirect()->route('sales.orders.edit', $order)->with('success', 'تم إرسال طلب التعديل لاعتماد المدير.');
     }
@@ -247,6 +260,12 @@ class SalesPortalController extends Controller
                 $this->salesAuditPayload($order->fresh(['customer', 'items']))
             );
         });
+
+        $this->notifyStakeholdersAboutSalesActivity(
+            $order->fresh(['items']),
+            'تحديث من المبيعات',
+            sprintf('قام قسم المبيعات بتحديث بيانات الطلب %s.', $order->order_number)
+        );
 
         return redirect()->route('sales.orders.edit', $order)->with('success', 'تم تحديث الطلب بنجاح.');
     }
@@ -341,6 +360,10 @@ class SalesPortalController extends Controller
     {
         $this->authorizeSalesAccess($request, $order);
 
+        if (!$order->canGenerateCommercialDocuments()) {
+            return back()->with('error', 'لا يمكن توليد عرض السعر قبل اعتماد المدير للطلب.');
+        }
+
         try {
             $this->documents->generateQuotation($order);
         } catch (ValidationException $exception) {
@@ -355,6 +378,10 @@ class SalesPortalController extends Controller
     public function generateInvoice(Request $request, Order $order)
     {
         $this->authorizeSalesAccess($request, $order);
+
+        if (!$order->canGenerateCommercialDocuments()) {
+            return back()->with('error', 'لا يمكن توليد الفاتورة قبل اعتماد المدير للطلب.');
+        }
 
         try {
             $this->documents->generateInvoice($order);
@@ -462,6 +489,51 @@ class SalesPortalController extends Controller
     {
         $order->items()->delete();
         $order->items()->createMany($items);
+    }
+
+    private function notifyStakeholdersAboutSalesActivity(Order $order, string $title, string $message, bool $notifyAdmins = true, bool $notifyFactory = true): void
+    {
+        if ($notifyAdmins) {
+            $admins = User::query()->where('role', 'admin')->where('is_active', true)->get();
+            if ($admins->isNotEmpty()) {
+                $this->notifications->send(
+                    $admins,
+                    new OrderStatusUpdatedNotification(
+                        $order,
+                        $title,
+                        $message,
+                        route('admin.orders.review', $order),
+                        [
+                            'status' => $order->status,
+                            'type' => 'sales_update',
+                            'sound_event' => 'sales_update',
+                            'tag' => 'sales-update-admin-' . $order->id,
+                        ]
+                    )
+                );
+            }
+        }
+
+        if ($notifyFactory) {
+            $factoryUsers = User::query()->where('role', 'factory')->where('is_active', true)->get();
+            if ($factoryUsers->isNotEmpty()) {
+                $this->notifications->send(
+                    $factoryUsers,
+                    new OrderStatusUpdatedNotification(
+                        $order,
+                        $title,
+                        $message,
+                        route('factory.orders.edit', $order),
+                        [
+                            'status' => $order->status,
+                            'type' => 'sales_update',
+                            'sound_event' => 'sales_update',
+                            'tag' => 'sales-update-factory-' . $order->id,
+                        ]
+                    )
+                );
+            }
+        }
     }
 
     private function salesAuditPayload(Order $order): array

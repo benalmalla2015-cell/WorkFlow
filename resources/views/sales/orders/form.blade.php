@@ -18,6 +18,7 @@
     if ($lineItems->isEmpty()) {
         $lineItems = collect([['item_name' => '', 'quantity' => 1, 'description' => '']]);
     }
+    $documentsEnabled = $mode === 'edit' && $order->canGenerateCommercialDocuments();
 @endphp
 
 @section('content')
@@ -253,25 +254,32 @@
                     <div class="card-body p-4">
                         <h2 class="h5 section-title">الوثائق</h2>
                         <div class="d-flex flex-wrap gap-2">
-                            @if ($order->resolvedItems()->isNotEmpty())
+                            @if ($order->resolvedItems()->isNotEmpty() && $documentsEnabled)
                                 <form method="POST" action="{{ route('sales.orders.quotation.generate', $order) }}">
                                     @csrf
                                     <button type="submit" class="btn btn-outline-success">توليد عرض سعر PDF</button>
                                 </form>
+                            @elseif ($order->resolvedItems()->isNotEmpty())
+                                <button type="button" class="btn btn-outline-success" disabled>توليد عرض سعر PDF</button>
                             @endif
                             @if ($order->quotation_path)
                                 <a href="{{ route('sales.orders.quotation.download', $order) }}" class="btn btn-success">تحميل عرض السعر PDF</a>
                             @endif
-                            @if ($order->resolvedItems()->isNotEmpty())
+                            @if ($order->resolvedItems()->isNotEmpty() && $documentsEnabled)
                                 <form method="POST" action="{{ route('sales.orders.invoice.generate', $order) }}">
                                     @csrf
                                     <button type="submit" class="btn btn-outline-danger">توليد فاتورة PDF</button>
                                 </form>
+                            @elseif ($order->resolvedItems()->isNotEmpty())
+                                <button type="button" class="btn btn-outline-danger" disabled>توليد فاتورة PDF</button>
                             @endif
                             @if ($order->invoice_path)
                                 <a href="{{ route('sales.orders.invoice.download', $order) }}" class="btn btn-danger">تحميل الفاتورة PDF</a>
                             @endif
                         </div>
+                        @if (!$documentsEnabled)
+                            <div class="alert alert-warning mt-3 mb-0">سيتم تفعيل توليد عرض السعر والفاتورة فقط بعد اعتماد المدير للطلب واستكمال مسار الموافقة.</div>
+                        @endif
                     </div>
                 </div>
             </div>

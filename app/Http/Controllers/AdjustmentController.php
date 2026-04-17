@@ -8,12 +8,17 @@ use App\Models\AuditLog;
 use App\Models\Notification;
 use App\Models\Setting;
 use App\Http\Controllers\NotificationController;
+use App\Services\OrderPricingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
 class AdjustmentController extends Controller
 {
+    public function __construct(private OrderPricingService $pricing)
+    {
+    }
+
     /**
      * Get all adjustment requests for admin
      */
@@ -78,8 +83,19 @@ class AdjustmentController extends Controller
             'type' => 'required|string|in:price_change,quantity_change,specs_change,cancel_order',
             'reason' => 'required|string|min:10',
             'proposed_payload' => 'required|array',
-            'proposed_payload.fields' => 'required|array',
+            'proposed_payload.fields' => 'nullable|array',
+            'proposed_payload.items' => 'nullable|array',
+            'proposed_payload.items.*.id' => 'required_with:proposed_payload.items|integer',
+            'proposed_payload.items.*.supplier_name' => 'required_with:proposed_payload.items|string|max:255',
+            'proposed_payload.items.*.product_code' => 'required_with:proposed_payload.items|string|max:100',
+            'proposed_payload.items.*.unit_cost' => 'required_with:proposed_payload.items|numeric|min:0.01',
         ]);
+
+        if (empty($validated['proposed_payload']['fields']) && empty($validated['proposed_payload']['items'])) {
+            return response()->json([
+                'message' => 'Adjustment payload must contain fields or priced items'
+            ], 422);
+        }
 
         try {
             DB::beginTransaction();
@@ -101,6 +117,15 @@ class AdjustmentController extends Controller
                     'specifications' => $order->specifications,
                     'supplier_name' => $order->supplier_name,
                     'production_days' => $order->production_days,
+                    'items' => $order->resolvedItems()->map(fn ($item) => [
+                        'id' => $item->id,
+                        'item_name' => $item->item_name,
+                        'quantity' => $item->quantity,
+                        'description' => $item->description,
+                        'supplier_name' => $item->supplier_name,
+                        'product_code' => $item->product_code,
+                        'unit_cost' => $item->unit_cost,
+                    ])->values()->all(),
                     'reason' => $validated['reason'],
                 ],
                 'proposed_payload' => $validated['proposed_payload'],
@@ -186,6 +211,25 @@ class AdjustmentController extends Controller
                     }
                 }
 
+                if (!empty($proposedPayload['items'])) {
+                    $items = $order->items()->get()->keyBy('id');
+                    foreach ($proposedPayload['items'] as $itemData) {
+                        $item = $items->get((int) ($itemData['id'] ?? 0));
+
+                        if (!$item) {
+                            continue;
+                        }
+
+                        $item->update([
+                            'supplier_name' => $itemData['supplier_name'] ?? null,
+                            'product_code' => $itemData['product_code'] ?? null,
+                            'unit_cost' => $itemData['unit_cost'] ?? null,
+                        ]);
+                    }
+
+                    $updateData['manager_approval'] = false;
+                }
+
                 // Restore original status if specified, otherwise keep pending_approval
                 if (isset($proposedPayload['restore_status']) && $proposedPayload['restore_status']) {
                     $updateData['status'] = $originalStatus;
@@ -199,7 +243,44 @@ class AdjustmentController extends Controller
 
                 $order->update($updateData);
 
-                $freshOrder = Order::withoutGlobalScopes()->findOrFail($order->id);
+                $freshOrder = Order::withoutGlobalScopes()->with('items')->findOrFail($order->id);
+
+                if (!empty($proposedPayload['items'])) {
+                    $oldFinancials = [
+                        'selling_price' => $freshOrder->selling_price,
+                        'final_price' => $freshOrder->final_price,
+                        'total_price' => $freshOrder->total_price,
+                        'net_profit' => $freshOrder->net_profit,
+                    ];
+
+                    $freshOrder->profit_margin_percentage = (float) ($freshOrder->profit_margin_percentage ?: Setting::get('default_profit_margin', 20));
+                    $summary = $this->pricing->syncOrderPricing($freshOrder, (float) $freshOrder->profit_margin_percentage);
+                    $freshOrder->supplier_name = $summary['supplier_name'];
+                    $freshOrder->product_code = $summary['product_code'];
+                    $freshOrder->factory_cost = $summary['factory_cost_average'] ?: null;
+                    $freshOrder->selling_price = $summary['sales_unit_price_average'] ?: null;
+                    $freshOrder->final_price = $summary['sales_total'] ?: null;
+                    $freshOrder->total_price = $summary['sales_total'] ?: null;
+                    $freshOrder->net_profit = $summary['net_profit'] ?: null;
+                    $freshOrder->quotation_path = null;
+                    $freshOrder->invoice_path = null;
+                    $freshOrder->save();
+
+                    AuditLog::log(
+                        'adjustment_approved',
+                        $freshOrder,
+                        $oldFinancials,
+                        [
+                            'selling_price' => $freshOrder->selling_price,
+                            'final_price' => $freshOrder->final_price,
+                            'total_price' => $freshOrder->total_price,
+                            'net_profit' => $freshOrder->net_profit,
+                        ],
+                        ['selling_price', 'final_price', 'total_price', 'net_profit']
+                    );
+
+                    $order = $freshOrder;
+                } else {
                 $quantity = max(1, (int) ($freshOrder->quantity ?: 1));
                 $factoryCost = (float) ($freshOrder->factory_cost ?: 0);
                 $sellingPrice = (float) ($freshOrder->selling_price ?: 0);
@@ -237,6 +318,7 @@ class AdjustmentController extends Controller
                     ],
                     ['selling_price', 'final_price', 'total_price', 'net_profit']
                 );
+                }
 
             } else {
                 // Rejected - just clear the pending changes, don't modify order
