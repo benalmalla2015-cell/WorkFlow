@@ -120,10 +120,6 @@
                     <div>{{ $order->pending_change_requested_at?->format('Y-m-d H:i:s') ?: '—' }}</div>
                 </div>
                 <div class="col-lg-4">
-                    <div class="fw-semibold mb-1">الحقول المتغيرة</div>
-                    <div class="text-muted">يوجد تعديلات معلقة</div>
-                </div>
-                <div class="col-lg-4">
                     <div class="fw-semibold mb-1">الحالة قبل الطلب</div>
                     <div>{{ $statusLabels[$pendingChanges['previous_status'] ?? ''] ?? '—' }}</div>
                 </div>

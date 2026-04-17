@@ -140,13 +140,13 @@
                                             @endif
                                             <div class="fw-semibold mb-1">القيم السابقة</div>
                                             @if ($log->old_values)
-                                                <pre class="small mb-2" style="white-space: pre-wrap;">{{ json_encode($log->old_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                                                <div class="text-muted mb-2">يوجد تفاصيل محفوظة في السجل</div>
                                             @else
                                                 <div class="text-muted mb-2">—</div>
                                             @endif
                                             <div class="fw-semibold mb-1">القيم الجديدة</div>
                                             @if ($log->new_values)
-                                                <pre class="small mb-0" style="white-space: pre-wrap;">{{ json_encode($log->new_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                                                <div class="text-muted">يوجد تفاصيل محفوظة في السجل</div>
                                             @else
                                                 <div class="text-muted">—</div>
                                             @endif
