@@ -54,25 +54,25 @@
         <table class="quote-grid">
             <thead>
                 <tr>
-                    <th rowspan="2" style="width:4%;">No.</th>
-                    <th rowspan="2" style="width:12%;">Item Name</th>
-                    <th rowspan="2" style="width:10%;">Reference Picture</th>
-                    <th rowspan="2" style="width:7%;">HS CODE</th>
-                    <th rowspan="2" style="width:8%;">Barcode</th>
-                    <th rowspan="2" style="width:8%;">Material</th>
-                    <th rowspan="2" style="width:6%;">Color</th>
-                    <th rowspan="2" style="width:6%;">Size</th>
-                    <th colspan="2" style="width:14%;">Packaging</th>
-                    <th rowspan="2" style="width:7%;">Loading Container</th>
-                    <th colspan="2" style="width:9%;">Quantities</th>
-                    <th rowspan="2" style="width:8%;">Unit Cost<br>USD</th>
-                    <th rowspan="2" style="width:9%;">Sub-total Cost<br>USD</th>
-                    <th rowspan="2" style="width:8%;">Production Lead Time<br>DAYS</th>
+                    <th rowspan="2" style="width:3%;">No.</th>
+                    <th rowspan="2" style="width:14%;">Item Name</th>
+                    <th rowspan="2" style="width:9%;">Reference Pic</th>
+                    <th rowspan="2" style="width:5%;">HS Code</th>
+                    <th rowspan="2" style="width:6%;">Barcode</th>
+                    <th rowspan="2" style="width:6%;">Material</th>
+                    <th rowspan="2" style="width:4%;">Color</th>
+                    <th rowspan="2" style="width:4%;">Size</th>
+                    <th colspan="2" style="width:10%;">Packaging</th>
+                    <th rowspan="2" style="width:6%;">Container</th>
+                    <th colspan="2" style="width:7%;">Qty</th>
+                    <th rowspan="2" style="width:7%;">Unit Cost<br>USD</th>
+                    <th rowspan="2" style="width:8%;">Sub-total<br>USD</th>
+                    <th rowspan="2" style="width:6%;">Lead Time<br>Days</th>
                 </tr>
                 <tr class="subhead">
-                    <th>Quantities / Carton</th>
+                    <th>Qty / Carton</th>
                     <th>Carton Size</th>
-                    <th>PALLETS</th>
+                    <th>Pallets</th>
                     <th>PCS</th>
                 </tr>
             </thead>
