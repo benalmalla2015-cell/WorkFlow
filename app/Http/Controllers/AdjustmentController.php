@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\AdjustmentLog;
+use App\Models\AuditLog;
 use App\Models\Notification;
+use App\Models\Setting;
 use App\Http\Controllers\NotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -196,6 +198,45 @@ class AdjustmentController extends Controller
                 $updateData['pending_change_original_status'] = null;
 
                 $order->update($updateData);
+
+                $freshOrder = Order::withoutGlobalScopes()->findOrFail($order->id);
+                $quantity = max(1, (int) ($freshOrder->quantity ?: 1));
+                $factoryCost = (float) ($freshOrder->factory_cost ?: 0);
+                $sellingPrice = (float) ($freshOrder->selling_price ?: 0);
+
+                if ($factoryCost > 0 && $sellingPrice <= 0) {
+                    $margin = (float) ($freshOrder->profit_margin_percentage ?: Setting::get('default_profit_margin', 20));
+                    $sellingPrice = round($factoryCost * (1 + ($margin / 100)), 2);
+                    $freshOrder->profit_margin_percentage = $margin;
+                }
+
+                $totalPrice = round($sellingPrice * $quantity, 2);
+                $netProfit = round(($sellingPrice - $factoryCost) * $quantity, 2);
+                $oldFinancials = [
+                    'selling_price' => $freshOrder->selling_price,
+                    'final_price' => $freshOrder->final_price,
+                    'total_price' => $freshOrder->total_price,
+                    'net_profit' => $freshOrder->net_profit,
+                ];
+
+                $freshOrder->selling_price = $sellingPrice;
+                $freshOrder->final_price = $totalPrice;
+                $freshOrder->total_price = $totalPrice;
+                $freshOrder->net_profit = $netProfit;
+                $freshOrder->save();
+
+                AuditLog::log(
+                    'adjustment_approved',
+                    $freshOrder,
+                    $oldFinancials,
+                    [
+                        'selling_price' => $sellingPrice,
+                        'final_price' => $totalPrice,
+                        'total_price' => $totalPrice,
+                        'net_profit' => $netProfit,
+                    ],
+                    ['selling_price', 'final_price', 'total_price', 'net_profit']
+                );
 
             } else {
                 // Rejected - just clear the pending changes, don't modify order

@@ -35,27 +35,39 @@ class FirebasePushService
     {
         try {
             $projectId = (string) config('firebase.project_id');
+            $url = (string) ($payload['url'] ?? route('dashboard'));
+            $title = (string) ($payload['title'] ?? 'تنبيه جديد');
+            $message = (string) ($payload['message'] ?? '');
+            $tag = (string) ($payload['tag'] ?? ('order-' . ($payload['order_id'] ?? 'workflow')));
             $response = Http::withToken($this->accessToken())
                 ->acceptJson()
                 ->post(sprintf('https://fcm.googleapis.com/v1/projects/%s/messages:send', $projectId), [
                     'message' => [
                         'token' => $token,
                         'notification' => [
-                            'title' => (string) ($payload['title'] ?? 'تنبيه جديد'),
-                            'body' => (string) ($payload['message'] ?? ''),
+                            'title' => $title,
+                            'body' => $message,
                         ],
                         'data' => $this->normalizeDataPayload($payload),
                         'webpush' => [
                             'fcm_options' => [
-                                'link' => (string) ($payload['url'] ?? route('dashboard')),
+                                'link' => $url,
                             ],
                             'notification' => [
-                                'title' => (string) ($payload['title'] ?? 'تنبيه جديد'),
-                                'body' => (string) ($payload['message'] ?? ''),
-                                'tag' => (string) ($payload['tag'] ?? ('order-' . ($payload['order_id'] ?? 'workflow'))),
+                                'title' => $title,
+                                'body' => $message,
+                                'tag' => $tag,
+                                'icon' => '/favicon.ico',
+                                'badge' => '/favicon.ico',
                                 'requireInteraction' => false,
                                 'data' => [
-                                    'url' => (string) ($payload['url'] ?? route('dashboard')),
+                                    'url' => $url,
+                                    'title' => $title,
+                                    'message' => $message,
+                                    'type' => (string) ($payload['type'] ?? ''),
+                                    'sound_event' => (string) ($payload['sound_event'] ?? ''),
+                                    'tag' => $tag,
+                                    'order_id' => (string) ($payload['order_id'] ?? ''),
                                 ],
                             ],
                         ],

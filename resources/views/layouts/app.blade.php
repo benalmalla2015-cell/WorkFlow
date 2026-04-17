@@ -218,7 +218,10 @@
                 const notificationDot = document.getElementById('notification-dot');
                 const unreadCounter = document.getElementById('notification-unread-count');
                 const toastStack = document.getElementById('notification-toast-stack');
+                const notificationBellUrl = '/bell.mp3';
                 let latestNotificationId = null;
+                let lastNotificationFingerprint = null;
+                let lastNotificationFingerprintAt = 0;
 
                 const escapeHtml = (value) => String(value ?? '')
                     .replace(/&/g, '&amp;')
@@ -227,7 +230,51 @@
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&#039;');
 
-                const playNotificationSound = () => {
+                const normalizeIncomingNotification = (payload = {}) => {
+                    const data = payload.data || payload;
+                    const notification = payload.notification || {};
+                    const title = notification.title || data.title || 'تنبيه جديد';
+                    const message = notification.body || data.message || data.body || '';
+                    const type = data.type || payload.type || '';
+                    const soundEvent = data.sound_event || payload.sound_event || '';
+                    const searchableText = `${title} ${message}`;
+
+                    return {
+                        title,
+                        message,
+                        url: data.url || data.action_url || payload.url || @json(route('dashboard')),
+                        type,
+                        soundEvent,
+                        tag: data.tag || payload.tag || '',
+                        orderId: data.order_id || payload.order_id || '',
+                        shouldPlaySound: Boolean(payload.should_play_sound)
+                            || ['adjustment_request', 'new_order'].includes(soundEvent)
+                            || ['order_change_requested', 'adjustment_requested', 'new_order'].includes(type)
+                            || /طلب تعديل|طلب جديد/.test(searchableText),
+                    };
+                };
+
+                const isDuplicateNotification = (notification) => {
+                    const fingerprint = [
+                        notification.title,
+                        notification.message,
+                        notification.tag,
+                        notification.orderId,
+                        notification.type,
+                        notification.soundEvent,
+                    ].join('|');
+
+                    const now = Date.now();
+                    if (fingerprint && fingerprint === lastNotificationFingerprint && (now - lastNotificationFingerprintAt) < 4000) {
+                        return true;
+                    }
+
+                    lastNotificationFingerprint = fingerprint;
+                    lastNotificationFingerprintAt = now;
+                    return false;
+                };
+
+                const playFallbackNotificationSound = () => {
                     try {
                         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
                         if (!AudioContextClass) {
@@ -255,6 +302,18 @@
                     }
                 };
 
+                const playNotificationSound = async () => {
+                    try {
+                        const audio = new Audio(notificationBellUrl);
+                        audio.preload = 'auto';
+                        await audio.play();
+                        return;
+                    } catch (error) {
+                    }
+
+                    playFallbackNotificationSound();
+                };
+
                 const showToast = (title, message) => {
                     if (!toastStack) {
                         return;
@@ -280,6 +339,27 @@
                     }
                     if (notificationDot) {
                         notificationDot.classList.toggle('d-none', !(count > 0));
+                    }
+                };
+
+                const processIncomingNotification = (payload, options = {}) => {
+                    const { refresh = true } = options;
+                    const notification = normalizeIncomingNotification(payload);
+
+                    if (isDuplicateNotification(notification)) {
+                        return;
+                    }
+
+                    if (notification.shouldPlaySound) {
+                        playNotificationSound();
+                    }
+
+                    if (notification.title || notification.message) {
+                        showToast(notification.title, notification.message);
+                    }
+
+                    if (refresh) {
+                        refreshNotificationFeed();
                     }
                 };
 
@@ -340,8 +420,7 @@
                         const notifications = payload.notifications || [];
                         const newLatestId = notifications[0]?.id || null;
                         if (options.playSound && latestNotificationId && newLatestId && newLatestId !== latestNotificationId) {
-                            playNotificationSound();
-                            showToast(notifications[0].title, notifications[0].message);
+                            processIncomingNotification(notifications[0], { refresh: false });
                         }
 
                         latestNotificationId = newLatestId;
@@ -376,6 +455,14 @@
                     try {
                         firebase.initializeApp(firebaseConfig);
                         const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                        navigator.serviceWorker.addEventListener('message', (event) => {
+                            if (event?.data?.type !== 'workflow-notification' || !event.data.payload) {
+                                return;
+                            }
+
+                            processIncomingNotification(event.data.payload);
+                        });
+
                         const permission = Notification.permission === 'granted'
                             ? 'granted'
                             : (Notification.permission === 'default'
@@ -395,11 +482,7 @@
                         await syncFirebaseToken(token);
 
                         messaging.onMessage((payload) => {
-                            const data = payload?.data || {};
-                            const notification = payload?.notification || {};
-                            playNotificationSound();
-                            showToast(notification.title || data.title, notification.body || data.message);
-                            refreshNotificationFeed();
+                            processIncomingNotification(payload);
                         });
                     } catch (error) {
                     }

@@ -21,6 +21,8 @@
             'order.selling_price' => 'سعر البيع',
             'order.profit_margin_percentage' => 'هامش الربح',
             'order.final_price' => 'السعر النهائي',
+            'order.total_price' => 'إجمالي السعر',
+            'order.net_profit' => 'صافي الربح',
             'order.factory_user_id' => 'مسؤول المصنع',
             'order.status' => 'الحالة',
         ];
@@ -73,6 +75,7 @@
                             <th>الإجراء</th>
                             <th>النموذج</th>
                             <th>المعرف</th>
+                            <th>الملخص العربي</th>
                             <th>الحقول المتغيرة</th>
                             <th>IP</th>
                             <th>تفاصيل</th>
@@ -112,9 +115,12 @@
                             <tr>
                                 <td>{{ optional($log->created_at)->format('Y-m-d H:i:s') }}</td>
                                 <td>{{ optional($log->user)->name ?: '—' }}</td>
-                                <td><span class="badge text-bg-dark">{{ $log->action }}</span></td>
+                                <td><span class="badge text-bg-dark">{{ $log->humanActionLabel() }}</span></td>
                                 <td>{{ $log->model_type ? class_basename($log->model_type) : '—' }}</td>
                                 <td>{{ $log->model_id ?: '—' }}</td>
+                                <td>
+                                    <div class="small">{{ $log->humanSummary() }}</div>
+                                </td>
                                 <td>
                                     @if ($changedFields->isNotEmpty())
                                         <div class="d-flex flex-wrap gap-1">
@@ -131,6 +137,19 @@
                                     <details>
                                         <summary class="small text-primary" style="cursor: pointer;">عرض السجل</summary>
                                         <div class="mt-2 small">
+                                            <div class="fw-semibold mb-1">الوصف البشري</div>
+                                            @php
+                                                $humanLines = $log->humanChangeLines();
+                                            @endphp
+                                            @if (!empty($humanLines))
+                                                <ul class="ps-3 mb-2">
+                                                    @foreach ($humanLines as $line)
+                                                        <li class="mb-1">{{ $line }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            @else
+                                                <div class="text-muted mb-2">{{ $log->humanSummary() }}</div>
+                                            @endif
                                             <div class="fw-semibold mb-1">القيم السابقة</div>
                                             @if ($log->old_values)
                                                 <pre class="small mb-2" style="white-space: pre-wrap;">{{ json_encode($log->old_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
@@ -149,7 +168,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">لا توجد سجلات.</td>
+                                <td colspan="9" class="text-center py-5 text-muted">لا توجد سجلات.</td>
                             </tr>
                         @endforelse
                     </tbody>

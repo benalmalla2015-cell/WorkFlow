@@ -210,13 +210,17 @@ class OrderController extends Controller
         try {
             $oldValues = $order->toArray();
 
-            // Calculate final price with custom margin
-            $finalPrice = $order->factory_cost * (1 + $request->profit_margin_percentage / 100);
+            $quantity = max(1, (int) ($order->quantity ?: 1));
+            $sellingPrice = (float) $order->factory_cost * (1 + ((float) $request->profit_margin_percentage / 100));
+            $totalPrice = round($sellingPrice * $quantity, 2);
+            $netProfit = round(($sellingPrice - (float) $order->factory_cost) * $quantity, 2);
 
             $order->update([
                 'profit_margin_percentage' => $request->profit_margin_percentage,
-                'selling_price' => $finalPrice,
-                'final_price' => $finalPrice,
+                'selling_price' => $sellingPrice,
+                'final_price' => $totalPrice,
+                'total_price' => $totalPrice,
+                'net_profit' => $netProfit,
                 'status' => 'approved',
                 'manager_approval' => true,
             ]);

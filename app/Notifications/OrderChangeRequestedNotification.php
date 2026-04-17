@@ -33,6 +33,9 @@ class OrderChangeRequestedNotification extends Notification
                 strtoupper((string) $this->requester->role),
                 $this->order->order_number
             ),
+            'type' => 'order_change_requested',
+            'sound_event' => 'adjustment_request',
+            'tag' => 'adjustment-request-' . $this->order->id,
             'order_id' => $this->order->id,
             'order_number' => $this->order->order_number,
             'requested_by' => $this->requester->name,

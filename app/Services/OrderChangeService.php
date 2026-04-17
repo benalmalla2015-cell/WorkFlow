@@ -191,6 +191,7 @@ class OrderChangeService
             $order->pending_change_requested_by = null;
             $order->pending_change_requested_at = null;
             $order->pending_change_original_status = null;
+            $this->syncFinancialValues($order);
             $order->save();
 
             $this->persistApprovedAttachments($order, $proposed['attachments'] ?? [], $requesterId);
@@ -211,7 +212,10 @@ class OrderChangeService
                 $order,
                 $oldSnapshot,
                 $newSnapshot,
-                $pendingChanges['changed_fields'] ?? []
+                array_values(array_unique(array_merge(
+                    $pendingChanges['changed_fields'] ?? [],
+                    ['order.total_price', 'order.net_profit', 'order.final_price']
+                )))
             );
 
             $requester = $adjustmentLog?->requester ?: User::find($requesterId);
@@ -339,6 +343,31 @@ class OrderChangeService
         return $entries;
     }
 
+    private function syncFinancialValues(Order $order): void
+    {
+        $quantity = max(1, (int) ($order->quantity ?: 1));
+        $factoryCost = (float) ($order->factory_cost ?: 0);
+        $sellingPrice = (float) ($order->selling_price ?: 0);
+
+        if ($sellingPrice <= 0 && $factoryCost > 0) {
+            $margin = (float) ($order->profit_margin_percentage ?: Setting::get('default_profit_margin', 20));
+            $sellingPrice = round($factoryCost * (1 + ($margin / 100)), 2);
+            $order->selling_price = $sellingPrice;
+            $order->profit_margin_percentage = $margin;
+        }
+
+        if ($sellingPrice <= 0 && $factoryCost <= 0) {
+            return;
+        }
+
+        $totalPrice = round($sellingPrice * $quantity, 2);
+        $netProfit = round(($sellingPrice - $factoryCost) * $quantity, 2);
+
+        $order->total_price = $totalPrice;
+        $order->final_price = $totalPrice;
+        $order->net_profit = $netProfit;
+    }
+
     private function notifyAdmins(Order $order, User $requester, array $pendingChanges): void
     {
         $admins = User::query()
@@ -425,6 +454,8 @@ class OrderChangeService
                 'selling_price' => $order->selling_price,
                 'profit_margin_percentage' => $order->profit_margin_percentage,
                 'final_price' => $order->final_price,
+                'total_price' => $order->total_price,
+                'net_profit' => $order->net_profit,
                 'status' => $order->status,
             ],
             'items' => $order->resolvedItems()->map(fn ($item) => [

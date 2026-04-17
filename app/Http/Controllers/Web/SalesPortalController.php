@@ -273,7 +273,12 @@ class SalesPortalController extends Controller
                 'تم إرسال طلب جديد للمراجعة',
                 sprintf('تم نقل الطلب %s من المبيعات إلى المصنع وهو بانتظار التسعير.', $order->order_number),
                 route('admin.orders.review', $order),
-                ['status' => 'sent_to_factory']
+                [
+                    'status' => 'sent_to_factory',
+                    'type' => 'new_order',
+                    'sound_event' => 'new_order',
+                    'tag' => 'new-order-admin-' . $order->id,
+                ]
             )
         );
 
@@ -284,7 +289,12 @@ class SalesPortalController extends Controller
                 'طلب جديد بانتظار التسعير',
                 sprintf('الطلب %s أصبح متاحًا للمصنع لإعداد التسعير.', $order->order_number),
                 route('factory.orders.edit', $order),
-                ['status' => 'sent_to_factory']
+                [
+                    'status' => 'sent_to_factory',
+                    'type' => 'new_order',
+                    'sound_event' => 'new_order',
+                    'tag' => 'new-order-factory-' . $order->id,
+                ]
             )
         );
 

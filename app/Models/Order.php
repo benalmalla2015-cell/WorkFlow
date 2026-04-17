@@ -29,6 +29,8 @@ class Order extends Model
         'selling_price',
         'profit_margin_percentage',
         'final_price',
+        'total_price',
+        'net_profit',
         'status',
         'pending_changes',
         'pending_change_requested_by',
@@ -202,6 +204,26 @@ class Order extends Model
     }
 
     public function getFinalPriceAttribute($value)
+    {
+        return $value ? Crypt::decrypt($value) : null;
+    }
+
+    public function setTotalPriceAttribute($value)
+    {
+        $this->attributes['total_price'] = $value ? Crypt::encrypt($value) : null;
+    }
+
+    public function getTotalPriceAttribute($value)
+    {
+        return $value ? Crypt::decrypt($value) : null;
+    }
+
+    public function setNetProfitAttribute($value)
+    {
+        $this->attributes['net_profit'] = $value ? Crypt::encrypt($value) : null;
+    }
+
+    public function getNetProfitAttribute($value)
     {
         return $value ? Crypt::decrypt($value) : null;
     }

@@ -236,12 +236,17 @@ class AdminPortalController extends Controller
         ]);
 
         $oldValues = $order->toArray();
-        $finalPrice = (float) $order->factory_cost * (1 + ((float) $validated['profit_margin_percentage'] / 100));
+        $quantity = max(1, (int) ($order->quantity ?: 1));
+        $sellingPrice = (float) $order->factory_cost * (1 + ((float) $validated['profit_margin_percentage'] / 100));
+        $totalPrice = round($sellingPrice * $quantity, 2);
+        $netProfit = round(($sellingPrice - (float) $order->factory_cost) * $quantity, 2);
 
         $order->update([
             'profit_margin_percentage' => $validated['profit_margin_percentage'],
-            'selling_price' => $finalPrice,
-            'final_price' => $finalPrice,
+            'selling_price' => $sellingPrice,
+            'final_price' => $totalPrice,
+            'total_price' => $totalPrice,
+            'net_profit' => $netProfit,
             'status' => 'approved',
             'manager_approval' => true,
         ]);

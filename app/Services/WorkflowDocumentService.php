@@ -152,16 +152,24 @@ class WorkflowDocumentService
     private function resolveTotals(Order $order, array $items): array
     {
         $totalQuantity = array_sum(array_column($items, 'quantity'));
-        $totalPrice = (float) ($order->final_price ?: $order->selling_price ?: 0);
-        $unitPrice = $totalQuantity > 0 && $totalPrice > 0 ? $totalPrice / $totalQuantity : 0;
+        $subtotal = (float) ($order->total_price ?: $order->final_price ?: 0);
+        $unitPrice = $totalQuantity > 0 && $subtotal > 0 ? $subtotal / $totalQuantity : 0;
+        $taxRate = (float) Setting::get('tax_rate', 0);
+        $taxAmount = round($subtotal * ($taxRate / 100), 2);
+        $grandTotal = round($subtotal + $taxAmount, 2);
 
         return [
             'quantity' => $totalQuantity,
             'unit_price' => round($unitPrice, 2),
-            'subtotal' => round($totalPrice, 2),
-            'total' => round($totalPrice, 2),
+            'subtotal' => round($subtotal, 2),
+            'tax_rate' => round($taxRate, 2),
+            'tax_amount' => $taxAmount,
+            'total' => $grandTotal,
+            'grand_total' => $grandTotal,
             'factory_cost' => round((float) ($order->factory_cost ?: 0), 2),
             'profit_margin' => round((float) ($order->profit_margin_percentage ?: 0), 2),
+            'net_profit' => round((float) ($order->net_profit ?: 0), 2),
+            'currency' => (string) Setting::get('currency', 'USD'),
         ];
     }
 }

@@ -13,15 +13,61 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage(function (payload) {
+const normalizePayload = function (payload) {
     const data = payload?.data || {};
     const notification = payload?.notification || {};
 
-    self.registration.showNotification(notification.title || data.title || 'تنبيه جديد', {
-        body: notification.body || data.message || '',
+    return {
+        title: notification.title || data.title || 'تنبيه جديد',
+        message: notification.body || data.message || data.body || '',
+        url: data.url || data.action_url || notification.click_action || '/dashboard',
         tag: data.tag || ('workflow-' + (data.order_id || 'notification')),
+        type: data.type || '',
+        sound_event: data.sound_event || '',
+        order_id: data.order_id || '',
+    };
+};
+
+const shouldPlayBell = function (payload) {
+    const searchableText = (payload.title || '') + ' ' + (payload.message || '');
+
+    return ['adjustment_request', 'new_order'].includes(payload.sound_event)
+        || ['order_change_requested', 'adjustment_requested', 'new_order'].includes(payload.type)
+        || /طلب تعديل|طلب جديد/.test(searchableText);
+};
+
+const notifyClients = function (payload) {
+    return clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (windowClients) {
+        windowClients.forEach(function (client) {
+            client.postMessage({
+                type: 'workflow-notification',
+                payload: payload,
+            });
+        });
+    });
+};
+
+messaging.onBackgroundMessage(function (payload) {
+    const normalized = normalizePayload(payload);
+
+    notifyClients({
+        ...normalized,
+        should_play_sound: shouldPlayBell(normalized),
+        source: 'service-worker-background',
+    });
+
+    self.registration.showNotification(normalized.title, {
+        body: normalized.message,
+        tag: normalized.tag,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
         data: {
-            url: data.url || '/dashboard',
+            url: normalized.url,
+            type: normalized.type,
+            sound_event: normalized.sound_event,
+            order_id: normalized.order_id,
+            title: normalized.title,
+            message: normalized.message,
         },
     });
 });
