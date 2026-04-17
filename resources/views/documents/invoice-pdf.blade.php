@@ -55,7 +55,7 @@
                 <div class="doc-card">
                     <div class="doc-name">INVOICE</div>
                     <div class="doc-meta">
-                        <strong>رقم الفاتورة:</strong> {{ $order->order_number }}<br>
+                        <strong>رقم الفاتورة:</strong> {{ $documentOrder['order_number'] }}<br>
                         <strong>التاريخ:</strong> {{ $generatedAt->format('Y-m-d') }}<br>
                         <strong>العملة:</strong> {{ $totals['currency'] }}
                     </div>
@@ -69,15 +69,15 @@
         <table class="meta-table">
             <tr>
                 <td class="label">العميل</td>
-                <td>{{ $order->resolvedCustomerName() ?: 'غير محدد' }}</td>
+                <td>{{ $documentOrder['customer_name'] }}</td>
             </tr>
             <tr>
                 <td class="label">مرجع الطلب</td>
-                <td>{{ $order->order_number }}</td>
+                <td>{{ $documentOrder['order_number'] }}</td>
             </tr>
             <tr>
                 <td class="label">مدة الإنتاج</td>
-                <td>{{ $order->production_days ?: '—' }} يوم</td>
+                <td>{{ $documentOrder['production_days'] }} يوم</td>
             </tr>
         </table>
     </div>

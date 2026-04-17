@@ -53,7 +53,7 @@
                 <div class="doc-card">
                     <div class="doc-name">QUOTATION</div>
                     <div class="doc-meta">
-                        <strong>رقم العرض:</strong> {{ $order->order_number }}<br>
+                        <strong>رقم العرض:</strong> {{ $documentOrder['order_number'] }}<br>
                         <strong>التاريخ:</strong> {{ $generatedAt->format('Y-m-d') }}<br>
                         <strong>صالح حتى:</strong> {{ $generatedAt->copy()->addDays(21)->format('Y-m-d') }}<br>
                         <strong>العملة:</strong> {{ $totals['currency'] }}
@@ -68,15 +68,15 @@
         <table class="customer-table">
             <tr>
                 <td class="label">العميل</td>
-                <td>{{ $order->resolvedCustomerName() ?: 'غير محدد' }}</td>
+                <td>{{ $documentOrder['customer_name'] }}</td>
             </tr>
             <tr>
                 <td class="label">مرجع الطلب</td>
-                <td>{{ $order->order_number }}</td>
+                <td>{{ $documentOrder['order_number'] }}</td>
             </tr>
             <tr>
                 <td class="label">مدة الإنتاج</td>
-                <td>{{ $order->production_days ?: '—' }} يوم</td>
+                <td>{{ $documentOrder['production_days'] }} يوم</td>
             </tr>
         </table>
     </div>

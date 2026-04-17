@@ -131,14 +131,19 @@ class WorkflowDocumentService
 
         $this->ensureDirectory($disk, $root);
 
-        $payload = [
+        $payload = $this->normalizeUtf8([
             'order' => $order,
+            'documentOrder' => [
+                'order_number' => (string) $order->order_number,
+                'customer_name' => $this->resolveCustomerName($order),
+                'production_days' => (string) ($order->production_days ?: '—'),
+            ],
             'items' => $items,
             'company' => $this->companyProfile(),
             'generatedAt' => now(),
             'verificationUrl' => $this->verificationUrl($order),
             'totals' => $this->resolveTotals($order, $items),
-        ];
+        ]);
 
         Storage::disk($disk)->put($relativePath, $this->renderPdf($view, $payload));
 
@@ -191,33 +196,111 @@ class WorkflowDocumentService
 
     private function renderPdf(string $view, array $payload): string
     {
-        $html = View::make($view, $payload)->render();
+        @ini_set('memory_limit', '256M');
+
+        $html = $this->sanitizeHtmlForPdf(View::make($view, $payload)->render());
 
         if (class_exists(Mpdf::class)) {
-            $tempDir = storage_path('app/mpdf-temp');
-            if (!is_dir($tempDir)) {
-                @mkdir($tempDir, 0775, true);
+            try {
+                return $this->renderWithMpdf($html);
+            } catch (\Throwable $exception) {
+                report($exception);
             }
-
-            $mpdf = new Mpdf([
-                'mode' => 'utf-8',
-                'format' => 'A4',
-                'margin_top' => 10,
-                'margin_bottom' => 10,
-                'margin_left' => 8,
-                'margin_right' => 8,
-                'tempDir' => $tempDir,
-                'default_font' => 'dejavusans',
-            ]);
-            $mpdf->SetDirectionality('rtl');
-            $mpdf->WriteHTML($html);
-
-            return $mpdf->Output('', 'S');
         }
 
+        return $this->renderWithDompdf($html);
+    }
+
+    private function renderWithMpdf(string $html): string
+    {
+        $fontDir = $this->ensureLocalDirectory(storage_path('fonts'));
+        $tempDir = $this->ensureLocalDirectory(storage_path('app/mpdf-temp'));
+        $defaultConfig = (new \Mpdf\Config\ConfigVariables())->getDefaults();
+
+        $mpdf = new Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'margin_top' => 10,
+            'margin_bottom' => 10,
+            'margin_left' => 8,
+            'margin_right' => 8,
+            'tempDir' => $tempDir,
+            'fontDir' => array_values(array_unique(array_merge($defaultConfig['fontDir'], [$fontDir]))),
+            'default_font' => 'dejavusans',
+        ]);
+        $mpdf->autoScriptToLang = true;
+        $mpdf->autoLangToFont = true;
+        $mpdf->SetDirectionality('rtl');
+        $mpdf->WriteHTML($html);
+
+        return $mpdf->Output('', 'S');
+    }
+
+    private function renderWithDompdf(string $html): string
+    {
         return Pdf::setOption([
             'isRemoteEnabled' => true,
             'defaultFont' => 'DejaVu Sans',
         ])->loadHTML($html)->setPaper('a4', 'portrait')->output();
+    }
+
+    private function ensureLocalDirectory(string $path): string
+    {
+        if (!is_dir($path)) {
+            @mkdir($path, 0775, true);
+        }
+
+        @chmod($path, 0775);
+
+        return $path;
+    }
+
+    private function sanitizeHtmlForPdf(string $html): string
+    {
+        $html = $this->normalizeUtf8String($html);
+
+        return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $html) ?? $html;
+    }
+
+    private function normalizeUtf8(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            return array_map(fn ($item) => $this->normalizeUtf8($item), $value);
+        }
+
+        if (is_string($value)) {
+            return $this->normalizeUtf8String($value);
+        }
+
+        return $value;
+    }
+
+    private function normalizeUtf8String(string $value): string
+    {
+        $value = str_replace("\0", '', $value);
+
+        if ($value === '') {
+            return $value;
+        }
+
+        if (mb_check_encoding($value, 'UTF-8')) {
+            return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $value) ?? $value;
+        }
+
+        foreach (['Windows-1256', 'ISO-8859-6', 'Windows-1252', 'ISO-8859-1'] as $encoding) {
+            $converted = @mb_convert_encoding($value, 'UTF-8', $encoding);
+
+            if (is_string($converted) && $converted !== '' && mb_check_encoding($converted, 'UTF-8')) {
+                return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $converted) ?? $converted;
+            }
+        }
+
+        $stripped = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+
+        if (is_string($stripped) && $stripped !== '') {
+            return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $stripped) ?? $stripped;
+        }
+
+        return preg_replace('/[\x00-\x1F\x7F]+/', '', $value) ?? '';
     }
 }
