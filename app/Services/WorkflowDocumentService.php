@@ -41,8 +41,9 @@ class WorkflowDocumentService
             'quotation',
             trim(config('workflow.quotations_root', 'quotations'), '/'),
             'quotation_generated',
-            'documents.quotation-pdf',
-            'quotation_path'
+            'documents.quotation-pdf-branded',
+            'quotation_path',
+            'landscape'
         );
     }
 
@@ -70,8 +71,9 @@ class WorkflowDocumentService
             'invoice',
             trim(config('workflow.invoices_root', 'invoices'), '/'),
             'invoice_generated',
-            'documents.invoice-pdf',
-            'invoice_path'
+            'documents.invoice-pdf-branded',
+            'invoice_path',
+            'portrait'
         );
     }
 
@@ -97,9 +99,13 @@ class WorkflowDocumentService
         return collect($this->pricing->summarize($order)['line_items'] ?? [])
             ->map(function ($item) {
                 return [
+                    'line' => (int) ($item['line'] ?? 0),
                     'item_name' => (string) ($item['item_name'] ?? ''),
                     'quantity' => max(1, (int) ($item['quantity'] ?? 1)),
                     'description' => (string) ($item['description'] ?? ''),
+                    'supplier_name' => (string) ($item['supplier_name'] ?? ''),
+                    'product_code' => (string) ($item['product_code'] ?? ''),
+                    'unit_cost' => round((float) ($item['unit_cost'] ?? 0), 2),
                     'sales_price' => round((float) ($item['sales_price'] ?? 0), 2),
                     'line_total' => round((float) ($item['sales_total'] ?? 0), 2),
                 ];
@@ -123,7 +129,8 @@ class WorkflowDocumentService
         string $root,
         string $auditAction,
         string $view,
-        string $pathField
+        string $pathField,
+        string $orientation = 'portrait'
     ): array {
         $disk = config('workflow.documents_disk', 'public');
         $filename = $documentType . '_' . $order->order_number . '_' . now()->format('Ymd_His') . '.pdf';
@@ -136,16 +143,24 @@ class WorkflowDocumentService
             'documentOrder' => [
                 'order_number' => (string) $order->order_number,
                 'customer_name' => $this->resolveCustomerName($order),
+                'customer_address' => (string) ($order->customer?->address ?? ''),
+                'customer_phone' => (string) ($order->customer?->phone ?? ''),
                 'production_days' => (string) ($order->production_days ?: '—'),
+                'product_name' => (string) ($order->product_name ?: collect($items)->pluck('item_name')->implode(' / ') ?: 'Quotation'),
+                'file_number' => 'XXX-' . substr((string) $order->order_number, -9),
+                'issue_date' => now()->format('Y-m-d'),
+                'issue_date_long' => now()->format('F jS, Y'),
+                'valid_until' => now()->copy()->addDays(21)->format('F jS, Y'),
             ],
             'items' => $items,
             'company' => $this->companyProfile(),
             'generatedAt' => now(),
             'verificationUrl' => $this->verificationUrl($order),
+            'salesRepresentative' => (string) ($order->salesUser?->name ?? ''),
             'totals' => $this->resolveTotals($order, $items),
         ]);
 
-        Storage::disk($disk)->put($relativePath, $this->renderPdf($view, $payload));
+        Storage::disk($disk)->put($relativePath, $this->renderPdf($view, $payload, $orientation));
 
         $order->update([$pathField => $relativePath]);
         AuditLog::log($auditAction, $order);
@@ -170,6 +185,8 @@ class WorkflowDocumentService
             'swift_code' => (string) Setting::get('swift_code', ''),
             'bank_address' => (string) Setting::get('bank_address', ''),
             'beneficiary_address' => (string) Setting::get('beneficiary_address', ''),
+            'country' => (string) Setting::get('company_country', 'China'),
+            'payment_purpose' => (string) Setting::get('payment_purpose', 'PURCHASE OF GOODS'),
         ];
     }
 
@@ -194,7 +211,7 @@ class WorkflowDocumentService
         ];
     }
 
-    private function renderPdf(string $view, array $payload): string
+    private function renderPdf(string $view, array $payload, string $orientation = 'portrait'): string
     {
         @ini_set('memory_limit', '256M');
 
@@ -202,16 +219,16 @@ class WorkflowDocumentService
 
         if (class_exists(Mpdf::class)) {
             try {
-                return $this->renderWithMpdf($html);
+                return $this->renderWithMpdf($html, $orientation);
             } catch (\Throwable $exception) {
                 report($exception);
             }
         }
 
-        return $this->renderWithDompdf($html);
+        return $this->renderWithDompdf($html, $orientation);
     }
 
-    private function renderWithMpdf(string $html): string
+    private function renderWithMpdf(string $html, string $orientation = 'portrait'): string
     {
         $fontDir = $this->ensureLocalDirectory(storage_path('fonts'));
         $tempDir = $this->ensureLocalDirectory(storage_path('app/mpdf-temp'));
@@ -219,7 +236,7 @@ class WorkflowDocumentService
 
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
-            'format' => 'A4',
+            'format' => $orientation === 'landscape' ? 'A4-L' : 'A4',
             'margin_top' => 10,
             'margin_bottom' => 10,
             'margin_left' => 8,
@@ -230,18 +247,22 @@ class WorkflowDocumentService
         ]);
         $mpdf->autoScriptToLang = true;
         $mpdf->autoLangToFont = true;
-        $mpdf->SetDirectionality('rtl');
         $mpdf->WriteHTML($html);
 
         return $mpdf->Output('', 'S');
     }
 
-    private function renderWithDompdf(string $html): string
+    private function renderWithDompdf(string $html, string $orientation = 'portrait'): string
     {
+        $tempDir = $this->ensureLocalDirectory(storage_path('app/dompdf-temp'));
+
         return Pdf::setOption([
             'isRemoteEnabled' => true,
+            'isHtml5ParserEnabled' => true,
             'defaultFont' => 'DejaVu Sans',
-        ])->loadHTML($html)->setPaper('a4', 'portrait')->output();
+            'tempDir' => $tempDir,
+            'chroot' => base_path('public'),
+        ])->loadHTML($html)->setPaper('a4', $orientation)->output();
     }
 
     private function ensureLocalDirectory(string $path): string

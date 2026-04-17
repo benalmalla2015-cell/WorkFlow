@@ -1,0 +1,387 @@
+@page {
+    margin: 16mm 12mm 16mm;
+}
+
+body {
+    font-family: DejaVu Sans, sans-serif;
+    font-size: 9pt;
+    color: #111827;
+    margin: 0;
+    padding: 0;
+    line-height: 1.45;
+    direction: ltr;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+.page-shell {
+    width: 100%;
+}
+
+.brand-header,
+.document-meta-table,
+.summary-table,
+.invoice-items,
+.payment-table,
+.quote-grid,
+.meta-pair-table,
+.footer-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.brand-header {
+    margin-bottom: 3mm;
+}
+
+.brand-identity {
+    width: 48%;
+    text-align: right;
+    vertical-align: top;
+}
+
+.brand-spacer {
+    width: 52%;
+}
+
+.brand-logo {
+    width: 215px;
+    height: auto;
+    display: inline-block;
+    margin-bottom: 1mm;
+}
+
+.brand-logo svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.brand-fallback {
+    font-size: 24pt;
+    font-weight: 800;
+    color: #113f87;
+    letter-spacing: 0.5px;
+}
+
+.brand-subtitle {
+    font-size: 8pt;
+    color: #6b7280;
+}
+
+.company-lines {
+    width: 100%;
+    margin: 2mm 0 4mm;
+    border-top: 1.6px solid #113f87;
+    border-bottom: 1px solid #c49b2d;
+    padding: 2mm 0 1.5mm;
+    text-align: center;
+}
+
+.company-address-line {
+    font-size: 7.4pt;
+    color: #1f2937;
+    font-weight: 700;
+}
+
+.company-contact-line {
+    margin-top: 1mm;
+    font-size: 7.3pt;
+    color: #374151;
+}
+
+.document-title {
+    text-align: center;
+    font-size: 17pt;
+    font-weight: 800;
+    color: #0f2f6f;
+    letter-spacing: 1.2px;
+    margin: 5mm 0 3.5mm;
+}
+
+.product-hero {
+    text-align: center;
+    font-size: 15pt;
+    font-weight: 700;
+    color: #111827;
+    margin: 3mm 0 4.5mm;
+}
+
+.recipient-row {
+    margin: 2.5mm 0 1.5mm;
+    padding-bottom: 1.5mm;
+    border-bottom: 1px solid #cfd8e3;
+    font-size: 11pt;
+    font-weight: 700;
+    color: #111827;
+}
+
+.recipient-row .label {
+    display: inline-block;
+    min-width: 38px;
+    color: #0f2f6f;
+    text-decoration: underline;
+}
+
+.document-meta-table {
+    margin: 2mm 0 3.5mm;
+}
+
+.document-meta-table td {
+    vertical-align: top;
+    font-size: 8.3pt;
+    padding: 0.5mm 0;
+}
+
+.document-meta-right {
+    width: 36%;
+    text-align: right;
+    color: #111827;
+}
+
+.document-meta-left {
+    width: 64%;
+    text-align: left;
+    color: #111827;
+}
+
+.meta-label {
+    font-weight: 700;
+    color: #0f2f6f;
+}
+
+.meta-highlight {
+    background: #f5ecd2;
+    border: 1px solid #c49b2d;
+    padding: 1.4mm 2mm;
+    font-weight: 700;
+    color: #6a4d00;
+}
+
+.rule-strong {
+    border: 0;
+    border-top: 1.6px solid #113f87;
+    margin: 2mm 0 2.5mm;
+}
+
+.rule-soft {
+    border: 0;
+    border-top: 1px solid #d1d5db;
+    margin: 1mm 0 2mm;
+}
+
+.project-line {
+    font-size: 8.7pt;
+    margin: 1.5mm 0 3.5mm;
+    padding: 0 0 1.6mm;
+    border-bottom: 1px dashed #7b8794;
+    color: #1f2937;
+}
+
+.project-line strong {
+    color: #0f2f6f;
+}
+
+.invoice-items th,
+.quote-grid th {
+    background: #113f87;
+    color: #ffffff;
+    border: 1px solid #0d2c61;
+    padding: 2.1mm 1.6mm;
+    font-size: 7.8pt;
+    text-align: center;
+    vertical-align: middle;
+    font-weight: 700;
+}
+
+.invoice-items .subhead,
+.quote-grid .subhead {
+    background: #e7eef9;
+    color: #113f87;
+    border: 1px solid #9db2d6;
+    font-size: 7.3pt;
+    font-weight: 700;
+}
+
+.invoice-items td,
+.quote-grid td {
+    border: 1px solid #b9c4d5;
+    padding: 2.2mm 1.6mm;
+    font-size: 7.8pt;
+    vertical-align: top;
+    color: #111827;
+}
+
+.invoice-items .amount,
+.quote-grid .amount,
+.align-right {
+    text-align: right;
+}
+
+.align-center {
+    text-align: center;
+}
+
+.invoice-items .grand-row td,
+.quote-grid .total-row td {
+    background: #0f2f6f;
+    color: #ffffff;
+    font-weight: 700;
+    border-color: #0d2c61;
+}
+
+.invoice-items .soft-total td {
+    background: #f3f4f6;
+    font-weight: 700;
+}
+
+.quote-grid .accent-total td,
+.payment-table .accent-label {
+    background: #f5ecd2;
+    color: #6a4d00;
+    font-weight: 700;
+}
+
+.quote-grid .placeholder,
+.placeholder {
+    color: #94a3b8;
+    text-align: center;
+}
+
+.payment-section-title {
+    margin: 4mm 0 1.5mm;
+    font-size: 9.3pt;
+    font-weight: 700;
+    color: #0f2f6f;
+    text-decoration: underline;
+}
+
+.payment-table td,
+.payment-table th {
+    border: 1px solid #7e8ea8;
+    padding: 1.8mm 2mm;
+    font-size: 7.7pt;
+    vertical-align: top;
+}
+
+.payment-table th {
+    width: 34%;
+    text-align: left;
+    background: #e7eef9;
+    color: #0f2f6f;
+    font-weight: 700;
+}
+
+.remark-box {
+    margin-top: 2.2mm;
+    padding-top: 1.5mm;
+    border-top: 1px solid #c49b2d;
+    color: #b91c1c;
+    font-size: 7.4pt;
+    font-weight: 700;
+}
+
+.summary-table {
+    margin-top: 3mm;
+}
+
+.summary-table td {
+    border: 1px solid #b9c4d5;
+    padding: 2mm 2.4mm;
+    font-size: 8pt;
+}
+
+.summary-table .label-cell {
+    background: #f9fafb;
+    font-weight: 700;
+    color: #0f2f6f;
+}
+
+.summary-table .value-cell {
+    text-align: right;
+}
+
+.summary-table .grand-cell {
+    background: #0f2f6f;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.meta-pair-table {
+    margin: 2.5mm 0 3.5mm;
+}
+
+.meta-pair-table td {
+    padding: 1.2mm 1.4mm;
+    font-size: 8.1pt;
+    border-bottom: 1px solid #dbe2ea;
+}
+
+.meta-pair-table .key {
+    width: 24%;
+    color: #0f2f6f;
+    font-weight: 700;
+}
+
+.quote-grid {
+    table-layout: fixed;
+    margin-top: 2mm;
+}
+
+.quote-grid .tight {
+    font-size: 7.1pt;
+}
+
+.quote-grid .title-band {
+    background: #f5ecd2;
+    color: #6a4d00;
+    font-weight: 700;
+    border: 1px solid #c49b2d;
+}
+
+.footer-table {
+    margin-top: 4mm;
+}
+
+.footer-table td {
+    vertical-align: bottom;
+}
+
+.footer-note {
+    font-size: 7.8pt;
+    color: #4b5563;
+}
+
+.footer-note strong {
+    color: #0f2f6f;
+}
+
+.verification-box {
+    margin-top: 1.5mm;
+    font-size: 7.5pt;
+    color: #0f2f6f;
+}
+
+.small-muted {
+    color: #6b7280;
+    font-size: 7.2pt;
+}
+
+.ar-line {
+    direction: rtl;
+    text-align: right;
+    font-size: 8pt;
+    color: #6b7280;
+    margin-top: 0.8mm;
+}
+
+.space-top {
+    margin-top: 3mm;
+}
+
+.bank-purpose {
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
