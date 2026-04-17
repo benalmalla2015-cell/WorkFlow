@@ -6,6 +6,7 @@
     $current = $pendingChanges['current'] ?? [];
     $proposed = $pendingChanges['proposed'] ?? [];
     $rawChangedFields = $pendingChanges['changed_fields'] ?? [];
+    $pendingRequester = is_array($pendingChanges['requested_by'] ?? null) ? $pendingChanges['requested_by'] : [];
     $requester = $order->pendingAdjustmentLog?->requester ?: $order->pendingChangeRequester;
     $roleLabels = [
         'admin' => 'الإدارة',
@@ -111,8 +112,8 @@
             <div class="row g-3 align-items-start">
                 <div class="col-lg-4">
                     <div class="fw-semibold mb-1">مقدم الطلب</div>
-                    <div>{{ $requester?->name ?: ($pendingChanges['requested_by']['name'] ?? '—') }}</div>
-                    <div class="text-muted small">{{ $roleLabels[$requester?->role ?: ($pendingChanges['requested_by']['role'] ?? '')] ?? '—' }}</div>
+                    <div>{{ $requester?->name ?: ($pendingRequester['name'] ?? '—') }}</div>
+                    <div class="text-muted small">{{ $roleLabels[$requester?->role ?: ($pendingRequester['role'] ?? '')] ?? '—' }}</div>
                 </div>
                 <div class="col-lg-4">
                     <div class="fw-semibold mb-1">وقت الطلب</div>
@@ -120,13 +121,7 @@
                 </div>
                 <div class="col-lg-4">
                     <div class="fw-semibold mb-1">الحقول المتغيرة</div>
-                    <div class="d-flex flex-wrap gap-1">
-                        @forelse ($changedFields as $field)
-                            <span class="badge text-bg-light border">{{ $field }}</span>
-                        @empty
-                            <span class="text-muted">—</span>
-                        @endforelse
-                    </div>
+                    <div class="text-muted">يوجد تعديلات معلقة</div>
                 </div>
                 <div class="col-lg-4">
                     <div class="fw-semibold mb-1">الحالة قبل الطلب</div>

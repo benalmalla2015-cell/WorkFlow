@@ -132,7 +132,6 @@
                             <th>مقدم الطلب</th>
                             <th>الدور</th>
                             <th>وقت الإرسال</th>
-                            <th>الحقول المتغيرة</th>
                             <th>إجراء</th>
                         </tr>
                     </thead>
@@ -140,57 +139,22 @@
                         @forelse ($pendingChangeRequests as $order)
                             @php
                                 $requester = $order->pendingAdjustmentLog?->requester ?: $order->pendingChangeRequester;
-                                $rawChangedFields = $order->pendingAdjustmentLog?->changed_fields
-                                    ?: ($order->pending_changes['changed_fields'] ?? []);
-                                $changedFields = collect($rawChangedFields)
-                                    ->map(function ($field) use ($changeFieldLabels) {
-                                        if (isset($changeFieldLabels[$field])) {
-                                            return $changeFieldLabels[$field];
-                                        }
-
-                                        if (preg_match('/^items\.\d+\./', $field)) {
-                                            return 'عناصر الطلب';
-                                        }
-
-                                        if (preg_match('/^attachments\.\d+\.(original_name|file_name)$/', $field)) {
-                                            return 'المرفقات';
-                                        }
-
-                                        if (preg_match('/^attachments\.\d+\./', $field)) {
-                                            return null;
-                                        }
-
-                                        return $changeFieldLabels[$field] ?? str($field)
-                                            ->replace(['order.', 'customer.'], '')
-                                            ->replace('_', ' ')
-                                            ->title()
-                                            ->toString();
-                                    })
-                                    ->filter()
-                                    ->unique()
-                                    ->values();
+                                $pendingRequester = is_array(data_get($order->pending_changes, 'requested_by'))
+                                    ? data_get($order->pending_changes, 'requested_by')
+                                    : [];
                             @endphp
                             <tr>
                                 <td class="fw-semibold">{{ $order->order_number }}</td>
-                                <td>{{ $requester?->name ?: ($order->pending_changes['requested_by']['name'] ?? '—') }}</td>
-                                <td>{{ $roleLabels[$requester?->role ?: ($order->pending_changes['requested_by']['role'] ?? '')] ?? '—' }}</td>
+                                <td>{{ $requester?->name ?: ($pendingRequester['name'] ?? '—') }}</td>
+                                <td>{{ $roleLabels[$requester?->role ?: ($pendingRequester['role'] ?? '')] ?? '—' }}</td>
                                 <td>{{ $order->pending_change_requested_at?->format('Y-m-d H:i') ?: '—' }}</td>
-                                <td>
-                                    <div class="d-flex flex-wrap gap-1">
-                                        @forelse ($changedFields as $field)
-                                            <span class="badge text-bg-light border">{{ $field }}</span>
-                                        @empty
-                                            <span class="text-muted">—</span>
-                                        @endforelse
-                                    </div>
-                                </td>
                                 <td>
                                     <a href="{{ route('admin.orders.pending-changes.review', $order) }}" class="btn btn-sm btn-primary">مقارنة واعتماد</a>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">لا توجد تعديلات معلقة حالياً.</td>
+                                <td colspan="5" class="text-center text-muted py-4">لا توجد تعديلات معلقة حالياً.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -242,7 +206,8 @@
                     <tbody>
                         @forelse ($orders as $order)
                             @php
-                                $currentOwner = $order->status === 'pending_approval'
+                                $hasPendingChange = $order->hasPendingChanges();
+                                $currentOwner = $hasPendingChange
                                     ? ($order->pendingAdjustmentLog?->requester?->name ?: $order->pendingChangeRequester?->name)
                                     : ($order->status === 'manager_review'
                                         ? optional($order->factoryUser)->name
@@ -255,7 +220,7 @@
                                 <td><span class="badge-status status-{{ $order->status }}">{{ $order->status_label }}</span></td>
                                 <td>{{ $currentOwner ?: '—' }}</td>
                                 <td>
-                                    @if ($order->status === 'pending_approval')
+                                    @if ($hasPendingChange)
                                         <a href="{{ route('admin.orders.pending-changes.review', $order) }}" class="btn btn-sm btn-outline-danger">مراجعة التعديل</a>
                                     @elseif ($order->status === 'manager_review')
                                         <a href="{{ route('admin.orders.review', $order) }}" class="btn btn-sm btn-outline-primary">مراجعة الطلب</a>

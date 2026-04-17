@@ -89,9 +89,23 @@ class AdjustmentController extends Controller
             'proposed_payload.items.*.supplier_name' => 'required_with:proposed_payload.items|string|max:255',
             'proposed_payload.items.*.product_code' => 'required_with:proposed_payload.items|string|max:100',
             'proposed_payload.items.*.unit_cost' => 'required_with:proposed_payload.items|numeric|min:0.01',
+            'proposed_payload.restore_status' => 'nullable|boolean',
         ]);
 
-        if (empty($validated['proposed_payload']['fields']) && empty($validated['proposed_payload']['items'])) {
+        $proposedFields = is_array($validated['proposed_payload']['fields'] ?? null)
+            ? $validated['proposed_payload']['fields']
+            : [];
+        $proposedItems = is_array($validated['proposed_payload']['items'] ?? null)
+            ? $validated['proposed_payload']['items']
+            : [];
+        $restoreStatus = (bool) ($validated['proposed_payload']['restore_status'] ?? true);
+        $workflowType = $proposedItems !== [] ? 'factory_edit' : 'sales_edit';
+        $changedFields = array_values(array_unique(array_merge(
+            array_map(fn ($field) => 'order.' . $field, array_keys($proposedFields)),
+            $proposedItems !== [] ? ['items'] : []
+        )));
+
+        if ($proposedFields === [] && $proposedItems === []) {
             return response()->json([
                 'message' => 'Adjustment payload must contain fields or priced items'
             ], 422);
@@ -105,10 +119,21 @@ class AdjustmentController extends Controller
                 'order_id' => $order->id,
                 'requester_id' => $user->id,
                 'requester_role' => $user->role,
-                'type' => $validated['type'],
+                'type' => $workflowType,
                 'status' => 'pending',
                 'previous_status' => $order->status,
+                'target_status' => $order->status,
                 'current_payload' => [
+                    'order' => [
+                        'status' => $order->status,
+                        'factory_cost' => $order->factory_cost,
+                        'selling_price' => $order->selling_price,
+                        'final_price' => $order->final_price,
+                        'quantity' => $order->quantity,
+                        'specifications' => $order->specifications,
+                        'supplier_name' => $order->supplier_name,
+                        'production_days' => $order->production_days,
+                    ],
                     'status' => $order->status,
                     'factory_cost' => $order->factory_cost,
                     'selling_price' => $order->selling_price,
@@ -128,17 +153,33 @@ class AdjustmentController extends Controller
                     ])->values()->all(),
                     'reason' => $validated['reason'],
                 ],
-                'proposed_payload' => $validated['proposed_payload'],
+                'proposed_payload' => [
+                    'fields' => $proposedFields,
+                    'order' => $proposedFields,
+                    'items' => $proposedItems,
+                    'restore_status' => $restoreStatus,
+                ],
+                'changed_fields' => $changedFields,
             ]);
 
             // Update order status to pending_approval
             $order->update([
+                'status' => 'pending_approval',
                 'pending_changes' => [
                     'adjustment_id' => $adjustment->id,
-                    'requested_by' => $user->id,
+                    'requested_by' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'role' => $user->role,
+                    ],
                     'requested_at' => now()->toIso8601String(),
-                    'type' => $validated['type'],
+                    'type' => $workflowType,
                     'reason' => $validated['reason'],
+                    'previous_status' => $order->status,
+                    'target_status' => $order->status,
+                    'changed_fields' => $changedFields,
+                    'current' => $adjustment->current_payload,
+                    'proposed' => $adjustment->proposed_payload,
                 ],
                 'pending_change_requested_by' => $user->id,
                 'pending_change_requested_at' => now(),
@@ -155,8 +196,9 @@ class AdjustmentController extends Controller
                 'adjustment' => $adjustment->load(['order', 'requester'])
             ], 201);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
+            report($e);
             return response()->json([
                 'message' => 'Failed to submit adjustment request: ' . $e->getMessage()
             ], 500);
@@ -185,11 +227,29 @@ class AdjustmentController extends Controller
             'review_notes' => 'nullable|string|max:1000',
         ]);
 
+        $proposedPayload = optional($adjustment)->proposed_payload;
+        $proposedPayload = is_array($proposedPayload) ? $proposedPayload : [];
+        $proposedFields = is_array($proposedPayload['fields'] ?? null)
+            ? $proposedPayload['fields']
+            : (is_array($proposedPayload['order'] ?? null) ? $proposedPayload['order'] : []);
+        $proposedItems = is_array($proposedPayload['items'] ?? null)
+            ? $proposedPayload['items']
+            : [];
+        $restoreStatus = array_key_exists('restore_status', $proposedPayload)
+            ? (bool) $proposedPayload['restore_status']
+            : true;
+
+        if ($validated['status'] === 'approved' && $proposedFields === [] && $proposedItems === []) {
+            return response()->json([
+                'message' => 'Adjustment payload is empty and cannot be approved'
+            ], 422);
+        }
+
         try {
             DB::beginTransaction();
 
             $order = $adjustment->order;
-            $originalStatus = $adjustment->previous_status;
+            $originalStatus = optional($adjustment)->previous_status ?: $order->pending_change_original_status ?: $order->status;
 
             // Update adjustment log
             $adjustment->update([
@@ -201,19 +261,22 @@ class AdjustmentController extends Controller
 
             if ($validated['status'] === 'approved') {
                 // Apply the proposed changes to the order
-                $proposedPayload = $adjustment->proposed_payload;
                 $updateData = [];
 
                 // Map proposed fields to order fields
-                if (isset($proposedPayload['fields'])) {
-                    foreach ($proposedPayload['fields'] as $field => $value) {
+                if ($proposedFields !== []) {
+                    foreach ($proposedFields as $field => $value) {
                         $updateData[$field] = $value;
                     }
                 }
 
-                if (!empty($proposedPayload['items'])) {
+                if ($proposedItems !== []) {
                     $items = $order->items()->get()->keyBy('id');
-                    foreach ($proposedPayload['items'] as $itemData) {
+                    foreach ($proposedItems as $itemData) {
+                        if (!is_array($itemData)) {
+                            continue;
+                        }
+
                         $item = $items->get((int) ($itemData['id'] ?? 0));
 
                         if (!$item) {
@@ -231,7 +294,7 @@ class AdjustmentController extends Controller
                 }
 
                 // Restore original status if specified, otherwise keep pending_approval
-                if (isset($proposedPayload['restore_status']) && $proposedPayload['restore_status']) {
+                if ($restoreStatus) {
                     $updateData['status'] = $originalStatus;
                 }
 
@@ -245,7 +308,7 @@ class AdjustmentController extends Controller
 
                 $freshOrder = Order::withoutGlobalScopes()->with('items')->findOrFail($order->id);
 
-                if (!empty($proposedPayload['items'])) {
+                if ($proposedItems !== []) {
                     $oldFinancials = [
                         'selling_price' => $freshOrder->selling_price,
                         'final_price' => $freshOrder->final_price,
@@ -323,6 +386,7 @@ class AdjustmentController extends Controller
             } else {
                 // Rejected - just clear the pending changes, don't modify order
                 $order->update([
+                    'status' => $originalStatus,
                     'pending_changes' => null,
                     'pending_change_requested_by' => null,
                     'pending_change_requested_at' => null,
@@ -347,8 +411,9 @@ class AdjustmentController extends Controller
                 'adjustment' => $adjustment->load(['order', 'requester', 'reviewer'])
             ]);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
+            report($e);
             return response()->json([
                 'message' => 'Failed to review adjustment: ' . $e->getMessage()
             ], 500);

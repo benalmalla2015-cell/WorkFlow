@@ -143,30 +143,58 @@ class OrderChangeService
 
         DB::transaction(function () use ($order, $admin, $adjustmentLog, $pendingChanges, $oldSnapshot) {
             $type = $adjustmentLog?->type ?? ($pendingChanges['type'] ?? null);
-            $proposed = $adjustmentLog?->proposed_payload ?? ($pendingChanges['proposed'] ?? []);
-            $requesterId = (int) ($adjustmentLog?->requester_id ?: data_get($pendingChanges, 'requested_by.id'));
+            $proposed = $this->normalizePendingPayload($adjustmentLog?->proposed_payload ?? ($pendingChanges['proposed'] ?? []));
+            $customerData = $this->payloadSection($proposed, 'customer');
+            $orderPayload = $this->payloadSection($proposed, 'order');
+            if ($orderPayload === [] && is_array($proposed['fields'] ?? null)) {
+                $orderPayload = $proposed['fields'];
+            }
+
+            $salesOrderData = Arr::only($orderPayload, [
+                'customer_name',
+                'product_name',
+                'quantity',
+                'specifications',
+                'customer_notes',
+            ]);
+            $factoryData = Arr::only($orderPayload, [
+                'production_days',
+                'factory_user_id',
+            ]);
+            $proposedItems = $this->payloadSection($proposed, 'items');
+            $attachments = $this->payloadSection($proposed, 'attachments');
+            $type = match ($type) {
+                'price_change', 'quantity_change', 'specs_change', 'cancel_order' => $proposedItems !== [] ? 'factory_edit' : 'sales_edit',
+                default => $type,
+            };
+            $requesterId = (int) ($adjustmentLog?->requester_id
+                ?: data_get($pendingChanges, 'requested_by.id')
+                ?: data_get($pendingChanges, 'requested_by'));
+            $uploadedBy = $requesterId > 0 ? $requesterId : $admin->id;
             $resolvedStatus = $adjustmentLog?->target_status ?? ($pendingChanges['target_status'] ?? ($order->pending_change_original_status ?: 'draft'));
 
+            if (!in_array($type, ['sales_edit', 'factory_edit'], true)) {
+                throw new \RuntimeException('Unsupported pending change type.');
+            }
+
             if ($type === 'sales_edit') {
-                $customerData = $proposed['customer'] ?? [];
+                if ($customerData === [] && $salesOrderData === [] && $proposedItems === [] && $attachments === []) {
+                    throw new \RuntimeException('Pending sales change payload is empty.');
+                }
+
                 if ($order->customer && $customerData !== []) {
                     $order->customer->update($customerData);
                 }
 
-                $orderData = Arr::only($proposed['order'] ?? [], [
-                    'customer_name',
-                    'product_name',
-                    'quantity',
-                    'specifications',
-                    'customer_notes',
-                ]);
-
-                if ($orderData !== []) {
-                    $order->fill($orderData);
+                if ($salesOrderData !== []) {
+                    $order->fill($salesOrderData);
                 }
 
-                $order->items()->delete();
-                $order->items()->createMany($proposed['items'] ?? []);
+                if ($proposedItems !== []) {
+                    $order->items()->delete();
+                    $order->items()->createMany($proposedItems);
+                }
+
                 $order->supplier_name = null;
                 $order->product_code = null;
                 $order->factory_cost = null;
@@ -181,13 +209,16 @@ class OrderChangeService
             }
 
             if ($type === 'factory_edit') {
-                $factoryData = Arr::only($proposed['order'] ?? [], [
-                    'production_days',
-                    'factory_user_id',
-                ]);
+                if ($factoryData === [] && $proposedItems === [] && $attachments === []) {
+                    throw new \RuntimeException('Pending factory change payload is empty.');
+                }
 
                 $items = $order->items()->get()->keyBy('id');
-                foreach ($proposed['items'] ?? [] as $itemData) {
+                foreach ($proposedItems as $itemData) {
+                    if (!is_array($itemData)) {
+                        continue;
+                    }
+
                     $item = $items->get((int) ($itemData['id'] ?? 0));
 
                     if (!$item) {
@@ -201,7 +232,10 @@ class OrderChangeService
                     ]);
                 }
 
-                $order->fill($factoryData);
+                if ($factoryData !== []) {
+                    $order->fill($factoryData);
+                }
+
                 $order->manager_approval = false;
                 $this->pricing->syncOrderPricing($order, (float) Setting::get('default_profit_margin', 20));
             }
@@ -214,7 +248,7 @@ class OrderChangeService
             $this->syncFinancialValues($order);
             $order->save();
 
-            $this->persistApprovedAttachments($order, $proposed['attachments'] ?? [], $requesterId);
+            $this->persistApprovedAttachments($order, $attachments, $uploadedBy);
 
             if ($adjustmentLog) {
                 $adjustmentLog->update([
@@ -249,12 +283,16 @@ class OrderChangeService
     {
         $order = Order::withoutGlobalScopes()->with('pendingAdjustmentLog.requester')->findOrFail($order->id);
         [$adjustmentLog, $pendingChanges] = $this->resolvePendingContext($order);
-        $requesterId = (int) ($adjustmentLog?->requester_id ?: data_get($pendingChanges, 'requested_by.id'));
+        $requesterId = (int) ($adjustmentLog?->requester_id
+            ?: data_get($pendingChanges, 'requested_by.id')
+            ?: data_get($pendingChanges, 'requested_by'));
 
         DB::transaction(function () use ($order, $admin, $adjustmentLog, $pendingChanges, $requesterId, $reason) {
             $oldValues = $order->toArray();
-            $proposed = $adjustmentLog?->proposed_payload ?? ($pendingChanges['proposed'] ?? []);
-            $this->deleteStagedAttachments($proposed['attachments'] ?? []);
+            $proposed = is_array($adjustmentLog?->proposed_payload)
+                ? $adjustmentLog?->proposed_payload
+                : (is_array($pendingChanges['proposed'] ?? null) ? $pendingChanges['proposed'] : []);
+            $this->deleteStagedAttachments($this->payloadSection($proposed, 'attachments'));
 
             $order->update([
                 'status' => $adjustmentLog?->previous_status ?: ($order->pending_change_original_status ?: ($pendingChanges['previous_status'] ?? 'draft')),
@@ -295,12 +333,16 @@ class OrderChangeService
     {
         $order = Order::withoutGlobalScopes()->with('pendingAdjustmentLog.requester')->findOrFail($order->id);
         [$adjustmentLog, $pendingChanges] = $this->resolvePendingContext($order);
-        $requesterId = (int) ($adjustmentLog?->requester_id ?: data_get($pendingChanges, 'requested_by.id'));
+        $requesterId = (int) ($adjustmentLog?->requester_id
+            ?: data_get($pendingChanges, 'requested_by.id')
+            ?: data_get($pendingChanges, 'requested_by'));
 
         DB::transaction(function () use ($order, $admin, $adjustmentLog, $pendingChanges, $requesterId, $reason) {
             $oldValues = $order->toArray();
-            $proposed = $adjustmentLog?->proposed_payload ?? ($pendingChanges['proposed'] ?? []);
-            $this->deleteStagedAttachments($proposed['attachments'] ?? []);
+            $proposed = is_array($adjustmentLog?->proposed_payload)
+                ? $adjustmentLog?->proposed_payload
+                : (is_array($pendingChanges['proposed'] ?? null) ? $pendingChanges['proposed'] : []);
+            $this->deleteStagedAttachments($this->payloadSection($proposed, 'attachments'));
 
             $order->update([
                 'status' => $adjustmentLog?->previous_status ?: ($order->pending_change_original_status ?: ($pendingChanges['previous_status'] ?? 'draft')),
@@ -407,6 +449,10 @@ class OrderChangeService
     private function persistApprovedAttachments(Order $order, array $attachments, int $uploadedBy): void
     {
         foreach ($attachments as $attachment) {
+            if (!is_array($attachment) || empty($attachment['path'])) {
+                continue;
+            }
+
             Attachment::create([
                 'order_id' => $order->id,
                 'uploaded_by' => $uploadedBy,
@@ -425,6 +471,10 @@ class OrderChangeService
         $disk = config('workflow.uploads_disk', 'public');
 
         foreach ($attachments as $attachment) {
+            if (!is_array($attachment)) {
+                continue;
+            }
+
             if (!empty($attachment['path'])) {
                 Storage::disk($disk)->delete($attachment['path']);
             }
@@ -453,7 +503,23 @@ class OrderChangeService
             ? $order->pendingAdjustmentLog
             : $order->pendingAdjustmentLog()->with('requester')->first();
 
-        return [$adjustmentLog, $order->pending_changes ?? []];
+        return [$adjustmentLog, is_array($order->pending_changes) ? $order->pending_changes : []];
+    }
+
+    private function normalizePendingPayload(mixed $payload): array
+    {
+        if (!is_array($payload)) {
+            throw new \RuntimeException('Pending change payload is invalid.');
+        }
+
+        return $payload;
+    }
+
+    private function payloadSection(array $payload, string $key): array
+    {
+        $section = $payload[$key] ?? [];
+
+        return is_array($section) ? $section : [];
     }
 
     private function snapshotOrder(Order $order): array

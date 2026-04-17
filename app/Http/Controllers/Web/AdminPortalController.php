@@ -49,11 +49,12 @@ class AdminPortalController extends Controller
         $pendingApprovals = Order::withoutGlobalScopes()
             ->with(['customer', 'salesUser', 'factoryUser', 'items'])
             ->where('status', 'manager_review')
+            ->whereNull('pending_changes')
+            ->whereDoesntHave('pendingAdjustmentLog', fn ($query) => $query->where('status', 'pending'))
             ->orderByDesc('updated_at')
             ->get();
         $pendingChangeRequests = Order::withoutGlobalScopes()
             ->with(['customer', 'salesUser', 'factoryUser', 'pendingChangeRequester', 'pendingAdjustmentLog.requester'])
-            ->where('status', 'pending_approval')
             ->where(function ($builder) {
                 $builder->whereNotNull('pending_changes')
                     ->orWhereHas('pendingAdjustmentLog', fn ($query) => $query->where('status', 'pending'));
@@ -82,7 +83,7 @@ class AdminPortalController extends Controller
             ->with(['customer', 'salesUser', 'factoryUser', 'attachments.uploadedBy', 'items'])
             ->findOrFail($order->id);
 
-        if ($order->hasPendingChanges() && $order->isPendingApproval()) {
+        if ($order->hasPendingChanges()) {
             return redirect()->route('admin.orders.pending-changes.review', $order);
         }
 
@@ -99,24 +100,30 @@ class AdminPortalController extends Controller
             ->with(['customer', 'salesUser', 'factoryUser', 'attachments.uploadedBy', 'items', 'pendingChangeRequester', 'pendingAdjustmentLog.requester'])
             ->findOrFail($order->id);
 
-        abort_unless($order->hasPendingChanges() && $order->isPendingApproval(), 404);
+        if (!$order->hasPendingChanges()) {
+            return redirect()
+                ->route('admin.orders.review', $order)
+                ->with('error', 'لا يوجد طلب تعديل معلّق لهذا الطلب.');
+        }
+
+        $pendingChanges = $order->pendingAdjustmentLog
+            ? [
+                'current' => $order->pendingAdjustmentLog?->current_payload,
+                'proposed' => $order->pendingAdjustmentLog?->proposed_payload,
+                'changed_fields' => $order->pendingAdjustmentLog?->changed_fields,
+                'requested_by' => [
+                    'id' => $order->pendingAdjustmentLog?->requester?->id,
+                    'name' => $order->pendingAdjustmentLog?->requester?->name,
+                    'role' => $order->pendingAdjustmentLog?->requester?->role,
+                ],
+                'previous_status' => $order->pendingAdjustmentLog?->previous_status,
+                'target_status' => $order->pendingAdjustmentLog?->target_status,
+            ]
+            : (is_array($order->pending_changes) ? $order->pending_changes : []);
 
         return view('admin.orders.pending-change-review', [
             'order' => $order,
-            'pendingChanges' => $order->pendingAdjustmentLog?->current_payload
-                ? [
-                    'current' => $order->pendingAdjustmentLog?->current_payload,
-                    'proposed' => $order->pendingAdjustmentLog?->proposed_payload,
-                    'changed_fields' => $order->pendingAdjustmentLog?->changed_fields,
-                    'requested_by' => [
-                        'id' => $order->pendingAdjustmentLog?->requester?->id,
-                        'name' => $order->pendingAdjustmentLog?->requester?->name,
-                        'role' => $order->pendingAdjustmentLog?->requester?->role,
-                    ],
-                    'previous_status' => $order->pendingAdjustmentLog?->previous_status,
-                    'target_status' => $order->pendingAdjustmentLog?->target_status,
-                ]
-                : ($order->pending_changes ?? []),
+            'pendingChanges' => $pendingChanges,
         ]);
     }
 
@@ -124,11 +131,19 @@ class AdminPortalController extends Controller
     {
         $order = Order::withoutGlobalScopes()->findOrFail($order->id);
 
-        if (!$order->hasPendingChanges() || !$order->isPendingApproval()) {
+        if (!$order->hasPendingChanges()) {
             return back()->with('error', 'لا يوجد طلب تعديل معلّق لهذا الطلب.');
         }
 
-        $this->orderChanges->approvePendingChange($order, $request->user());
+        try {
+            $this->orderChanges->approvePendingChange($order, $request->user());
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->route('admin.dashboard')
+                ->with('error', 'تعذر اعتماد التعديل بسبب بيانات ناقصة أو غير صالحة.');
+        }
 
         return redirect()->route('admin.dashboard')->with('success', 'تم اعتماد التعديلات المقترحة وتثبيت البيانات الأصلية.');
     }
@@ -137,7 +152,7 @@ class AdminPortalController extends Controller
     {
         $order = Order::withoutGlobalScopes()->findOrFail($order->id);
 
-        if (!$order->hasPendingChanges() || !$order->isPendingApproval()) {
+        if (!$order->hasPendingChanges()) {
             return back()->with('error', 'لا يوجد طلب تعديل معلّق لهذا الطلب.');
         }
 
@@ -145,7 +160,15 @@ class AdminPortalController extends Controller
             'reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $this->orderChanges->rejectPendingChange($order, $request->user(), $validated['reason'] ?? null);
+        try {
+            $this->orderChanges->rejectPendingChange($order, $request->user(), $validated['reason'] ?? null);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->route('admin.dashboard')
+                ->with('error', 'تعذر رفض التعديل بسبب بيانات ناقصة أو غير صالحة.');
+        }
 
         return redirect()->route('admin.dashboard')->with('success', 'تم رفض التعديلات المقترحة وإعادة الطلب لحالته السابقة.');
     }
@@ -154,7 +177,7 @@ class AdminPortalController extends Controller
     {
         $order = Order::withoutGlobalScopes()->findOrFail($order->id);
 
-        if (!$order->hasPendingChanges() || !$order->isPendingApproval()) {
+        if (!$order->hasPendingChanges()) {
             return back()->with('error', 'لا يوجد طلب تعديل معلّق لهذا الطلب.');
         }
 
@@ -162,7 +185,15 @@ class AdminPortalController extends Controller
             'reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $this->orderChanges->requestPendingChangeRevision($order, $request->user(), $validated['reason'] ?? null);
+        try {
+            $this->orderChanges->requestPendingChangeRevision($order, $request->user(), $validated['reason'] ?? null);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->route('admin.dashboard')
+                ->with('error', 'تعذر إعادة التعديل للاستكمال بسبب بيانات ناقصة أو غير صالحة.');
+        }
 
         return redirect()->route('admin.dashboard')->with('success', 'تم طلب تعديل إضافي من الموظف المعني.');
     }
@@ -228,10 +259,14 @@ class AdminPortalController extends Controller
     {
         $order = Order::withoutGlobalScopes()->with(['salesUser', 'factoryUser', 'items'])->findOrFail($order->id);
 
-        if ($order->hasPendingChanges() || $order->isPendingApproval()) {
+        if ($order->hasPendingChanges()) {
             return redirect()
                 ->route('admin.orders.pending-changes.review', $order)
                 ->with('error', 'يوجد طلب تعديل معلّق يجب مراجعته أولاً قبل اعتماد الطلب بالطريقة المعتادة.');
+        }
+
+        if ($order->isPendingApproval()) {
+            return redirect()->route('admin.dashboard')->with('error', 'الطلب ما زال في مرحلة اعتماد تعديل ولا يمكن اعتماده بالطريقة المعتادة الآن.');
         }
 
         if (!$order->isManagerReview() || !$order->hasCompleteFactoryItemPricing() || !$order->production_days) {
