@@ -32,12 +32,14 @@ else
     scp -P "$SSH_PORT" "$ARCHIVE_PATH_LOCAL" "$SSH_HOST:$ARCHIVE_PATH_REMOTE"
 fi
 
-echo "🛠️ Step 3: Deploying release on server..."
 if [ -n "$SSH_PASSWORD" ] && command -v plink >/dev/null 2>&1; then
-    plink -ssh -batch -P "$SSH_PORT" -pw "$SSH_PASSWORD" "$SSH_HOST" "ARCHIVE_PATH_REMOTE='$ARCHIVE_PATH_REMOTE' BASE_PATH='$BASE_PATH' APP_PATH='$APP_PATH' BACKUP_PATH='$BACKUP_PATH' bash -s" <<'REMOTE'
+    SSH_COMMAND=(plink -ssh -batch -P "$SSH_PORT" -pw "$SSH_PASSWORD" "$SSH_HOST")
 else
-    ssh -p "$SSH_PORT" "$SSH_HOST" "ARCHIVE_PATH_REMOTE='$ARCHIVE_PATH_REMOTE' BASE_PATH='$BASE_PATH' APP_PATH='$APP_PATH' BACKUP_PATH='$BACKUP_PATH' bash -s" <<'REMOTE'
+    SSH_COMMAND=(ssh -p "$SSH_PORT" "$SSH_HOST")
 fi
+
+echo "🛠️ Step 3: Deploying release on server..."
+"${SSH_COMMAND[@]}" "ARCHIVE_PATH_REMOTE='$ARCHIVE_PATH_REMOTE' BASE_PATH='$BASE_PATH' APP_PATH='$APP_PATH' BACKUP_PATH='$BACKUP_PATH' bash -s" <<'REMOTE'
 set -euo pipefail
 
 STAMP=$(date +%Y%m%d_%H%M%S)
