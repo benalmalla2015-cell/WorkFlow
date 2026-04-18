@@ -6,12 +6,13 @@
     $logoMarkup = $logoSvg !== '' ? $logoSvg : '<div class="brand-fallback">DAYANCO</div>';
     $bankFee = 40.00;
     $balanceDue = round((float) $totals['grand_total'] * 0.70, 2);
+    $invoiceTotalDue = round($balanceDue + $bankFee, 2);
     $paymentDetails = [
         'beneficiary_name' => $company['beneficiary_name'] ?: 'DAYANCO TRADING CO., LIMITED',
         'beneficiary_bank' => $company['beneficiary_bank'] ?: 'ZHEJIANG CHOUZHOU COMMERCIAL BANK',
         'account_number' => $company['account_number'] ?: 'NRA15617142010500006871',
-        'beneficiary_address' => $company['beneficiary_address'] ?: 'RM906, 9TH FLOOR, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA',
-        'bank_address' => $company['bank_address'] ?: 'YIWU, ZHEJIANG, CHINA',
+        'beneficiary_address' => $company['beneficiary_address'] ?: 'RM906, 9/F FLOOR, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA',
+        'bank_address' => $company['bank_address'] ?: 'YIWULEYUAN EAST, JIANGBIN RD, YIWU, ZHEJIANG, CHINA',
         'swift_code' => $company['swift_code'] ?: 'CZCBCN2X',
         'country' => $company['country'] ?: 'China',
         'payment_purpose' => $company['payment_purpose'] ?: 'PURCHASE OF GOODS',
@@ -31,7 +32,6 @@
                 <td class="brand-spacer"></td>
                 <td class="brand-identity">
                     <div class="brand-logo">{!! $logoMarkup !!}</div>
-                    <div class="ar-line">شركة ديانكو التجارية المحدودة</div>
                 </td>
             </tr>
         </table>
@@ -78,7 +78,6 @@
                             - Refer to quotation number {{ $documentOrder['order_number'] }}<br>
                             - Product Code: {{ $item['product_code'] ?: 'N/A' }}<br>
                             - Specifications: {{ $item['description'] ?: 'As approved quotation' }}<br>
-                            - Supplier: {{ $item['supplier_name'] ?: 'DAYANCO source' }}<br>
                             - Production Lead Time: around {{ $documentOrder['production_days'] }} days
                         </td>
                         <td class="amount">{{ number_format((float) $item['line_total'], 2) }}</td>
@@ -104,7 +103,7 @@
                 </tr>
                 <tr class="grand-row">
                     <td colspan="3" class="align-right">Total Amount due to This Invoice:</td>
-                    <td class="amount">{{ $totals['currency'] }} {{ number_format((float) $totals['grand_total'], 2) }}</td>
+                    <td class="amount"><span class="amount-chip">{{ $totals['currency'] }}{{ number_format($invoiceTotalDue, 2) }}</span></td>
                 </tr>
             </tbody>
         </table>
@@ -153,7 +152,7 @@
                 <td>
                     <div class="footer-note"><strong>Sales Representative:</strong> {{ $salesRepresentative ?: 'Sales Team' }}</div>
                     <div class="footer-note"><strong>Generated:</strong> {{ $generatedAt->format('Y-m-d H:i') }}</div>
-                    <div class="document-credentials"><strong>Prepared For:</strong> {{ $documentOrder['customer_name'] }}<br><strong>Document:</strong> Official DAYANCO Invoice</div>
+                    <div class="document-credentials"><strong>Prepared For:</strong> {{ $documentOrder['customer_name'] }}<br><strong>Document:</strong> DAYANCO Commercial Invoice</div>
                 </td>
                 <td style="width:36%; text-align:right;">
                     @if ($verificationQr)

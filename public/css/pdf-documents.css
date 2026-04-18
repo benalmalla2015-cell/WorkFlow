@@ -74,8 +74,8 @@ body {
 .company-lines {
     width: 100%;
     margin: 2mm 0 4mm;
-    border-top: 1.6px solid #113f87;
-    border-bottom: 1px solid #c49b2d;
+    border-top: 1px solid #d1d5db;
+    border-bottom: 1px solid #d1d5db;
     padding: 2mm 0 1.5mm;
     text-align: center;
 }
@@ -96,7 +96,7 @@ body {
     text-align: center;
     font-size: 17pt;
     font-weight: 800;
-    color: #0f2f6f;
+    color: #111827;
     letter-spacing: 1.2px;
     margin: 5mm 0 3.5mm;
 }
@@ -181,16 +181,29 @@ body {
 }
 
 .project-line strong {
-    color: #0f2f6f;
+    color: #111827;
 }
 
-.invoice-items th,
-.quote-grid th {
-    background: #113f87;
-    color: #ffffff;
-    border: 1px solid #0d2c61;
-    padding: 2.1mm 1.6mm;
+.invoice-items th {
+    background: #ffffff;
+    color: #111827;
+    border-top: 1px solid #111827;
+    border-bottom: 1px solid #6c8ebf;
+    border-left: 0;
+    border-right: 0;
+    padding: 1.8mm 1.4mm;
     font-size: 7.8pt;
+    text-align: left;
+    vertical-align: middle;
+    font-weight: 700;
+}
+
+.quote-grid th {
+    background: #dbe5f1;
+    color: #111827;
+    border: 1px solid #7f8ea3;
+    padding: 2mm 1.3mm;
+    font-size: 7.3pt;
     text-align: center;
     vertical-align: middle;
     font-weight: 700;
@@ -198,10 +211,10 @@ body {
 
 .invoice-items .subhead,
 .quote-grid .subhead {
-    background: #e7eef9;
-    color: #113f87;
+    background: #eef3fb;
+    color: #1f3f73;
     border: 1px solid #9db2d6;
-    font-size: 7.3pt;
+    font-size: 7.1pt;
     font-weight: 700;
 }
 
@@ -212,6 +225,17 @@ body {
     font-size: 7.8pt;
     vertical-align: top;
     color: #111827;
+}
+
+.invoice-items td {
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    border-bottom: 1px solid #cfd8e3;
+}
+
+.quote-grid td {
+    border: 1px solid #8d99a8;
 }
 
 .invoice-items .amount,
@@ -226,21 +250,21 @@ body {
 
 .invoice-items .grand-row td,
 .quote-grid .total-row td {
-    background: #0f2f6f;
-    color: #ffffff;
+    background: #ffffff;
+    color: #111827;
     font-weight: 700;
-    border-color: #0d2c61;
+    border-color: #cfd8e3;
 }
 
 .invoice-items .soft-total td {
-    background: #f3f4f6;
+    background: #ffffff;
     font-weight: 700;
 }
 
 .quote-grid .accent-total td,
 .payment-table .accent-label {
-    background: #f5ecd2;
-    color: #6a4d00;
+    background: #f8fafc;
+    color: #111827;
     font-weight: 700;
 }
 
@@ -269,8 +293,8 @@ body {
 .payment-table th {
     width: 34%;
     text-align: left;
-    background: #e7eef9;
-    color: #0f2f6f;
+    background: #f3f4f6;
+    color: #111827;
     font-weight: 700;
 }
 
@@ -363,6 +387,15 @@ body {
     font-size: 7.1pt;
     color: #4b5563;
     line-height: 1.45;
+}
+
+.amount-chip {
+    display: inline-block;
+    padding: 0.8mm 1.6mm;
+    background: #111827;
+    color: #ffffff;
+    font-weight: 800;
+    letter-spacing: 0.2px;
 }
 
 .verification-box {

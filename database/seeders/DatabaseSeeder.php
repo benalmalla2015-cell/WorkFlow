@@ -90,14 +90,19 @@ class DatabaseSeeder extends Seeder
 
         $defaultSettings = [
             'default_profit_margin' => '20',
-            'company_name' => 'مؤسسة مدحت رشاد للحلول التقنية',
-            'company_address' => 'يتم تحديد العنوان من لوحة الإعدادات',
-            'company_phone' => '+967000000000',
-            'beneficiary_name' => 'مؤسسة مدحت رشاد للحلول التقنية',
-            'beneficiary_bank' => 'يتم تحديد اسم البنك من لوحة الإعدادات',
-            'account_number' => 'يتم تحديد رقم الحساب من لوحة الإعدادات',
-            'swift_code' => 'يحدد من لوحة الإعدادات',
-            'bank_address' => 'يتم تحديد عنوان البنك من لوحة الإعدادات',
+            'company_name' => 'DAYANCO TRADING CO. LIMITED',
+            'company_address' => 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA',
+            'company_phone' => '+86 188188 45411',
+            'company_email' => 'team@dayancoofficial.com',
+            'company_attn' => 'Mr. Abdulmalek',
+            'beneficiary_name' => 'DAYANCO TRADING CO., LIMITED',
+            'beneficiary_bank' => 'ZHEJIANG CHOUZHOU COMMERCIAL BANK',
+            'account_number' => 'NRA15617142010500006871',
+            'swift_code' => 'CZCBCN2X',
+            'bank_address' => 'YIWU LEYUAN EAST, JIANGBIN RD, YIWU, ZHEJIANG, CHINA',
+            'beneficiary_address' => 'RM906, 9/F FLOOR, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000, P.R. CHINA',
+            'company_country' => 'China',
+            'payment_purpose' => 'PURCHASE OF GOODS',
         ];
 
         foreach ($defaultSettings as $key => $value) {

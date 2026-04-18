@@ -33,8 +33,8 @@
         <td>Loading Container</td>
         <td>PALLETS</td>
         <td>PCS</td>
-        <td>Unit Cost (EXW China)</td>
-        <td>Sub-total Cost (EXW China)</td>
+        <td>Final Price (USD)</td>
+        <td>Sub-total (USD)</td>
         <td>Production Lead Time (DAYS)</td>
     </tr>
     

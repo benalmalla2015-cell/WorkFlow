@@ -9,8 +9,8 @@
         'beneficiary_name' => $company['beneficiary_name'] ?: 'DAYANCO TRADING CO., LIMITED',
         'beneficiary_bank' => $company['beneficiary_bank'] ?: 'ZHEJIANG CHOUZHOU COMMERCIAL BANK',
         'account_number' => $company['account_number'] ?: 'NRA15617142010500006871',
-        'beneficiary_address' => $company['beneficiary_address'] ?: 'RM906, 9TH FLOOR, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA',
-        'bank_address' => $company['bank_address'] ?: 'YIWU, ZHEJIANG, CHINA',
+        'beneficiary_address' => $company['beneficiary_address'] ?: 'RM906, 9/F FLOOR, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA',
+        'bank_address' => $company['bank_address'] ?: 'YIWULEYUAN EAST, JIANGBIN RD, YIWU, ZHEJIANG, CHINA',
         'swift_code' => $company['swift_code'] ?: 'CZCBCN2X',
         'country' => $company['country'] ?: 'China',
         'payment_purpose' => $company['payment_purpose'] ?: 'PURCHASE OF GOODS',
@@ -30,7 +30,6 @@
                 <td class="brand-spacer"></td>
                 <td class="brand-identity">
                     <div class="brand-logo">{!! $logoMarkup !!}</div>
-                    <div class="ar-line">شركة ديانكو التجارية المحدودة</div>
                 </td>
             </tr>
         </table>
@@ -75,8 +74,8 @@
                     <th colspan="2" style="width:10%;">Packaging</th>
                     <th rowspan="2" style="width:6%;">Container</th>
                     <th colspan="2" style="width:7%;">Qty</th>
-                    <th rowspan="2" style="width:7%;">Unit Price<br>USD</th>
-                    <th rowspan="2" style="width:8%;">Line Total<br>USD</th>
+                    <th rowspan="2" style="width:7%;">Final Price<br>USD</th>
+                    <th rowspan="2" style="width:8%;">Sub-total<br>USD</th>
                     <th rowspan="2" style="width:6%;">Lead Time<br>Days</th>
                 </tr>
                 <tr class="subhead">
@@ -90,7 +89,7 @@
                 @forelse ($items as $item)
                     <tr>
                         <td class="align-center">{{ $item['line'] ?: $loop->iteration }}</td>
-                        <td>{{ $item['item_name'] }}@if($item['supplier_name'])<br><span class="small-muted">{{ $item['supplier_name'] }}</span>@endif</td>
+                        <td>{{ $item['item_name'] }}</td>
                         <td class="placeholder">Image Ref</td>
                         <td class="align-center">{{ $placeholder }}</td>
                         <td class="align-center">{{ $item['product_code'] ?: $placeholder }}</td>
@@ -112,7 +111,7 @@
                     </tr>
                 @endforelse
                 <tr class="accent-total">
-                    <td colspan="13" class="align-right">Grand Total</td>
+                    <td colspan="13" class="align-right">Total Quotation Value</td>
                     <td class="amount">{{ $totals['currency'] }} {{ number_format((float) $totals['unit_price'], 2) }}</td>
                     <td class="amount">{{ $totals['currency'] }} {{ number_format((float) $totals['grand_total'], 2) }}</td>
                     <td class="align-center">{{ $documentOrder['production_days'] }}</td>

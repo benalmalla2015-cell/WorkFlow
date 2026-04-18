@@ -29,21 +29,21 @@ return new class extends Migration
             ],
             [
                 'key' => 'company_name',
-                'value' => 'مؤسسة مدحت رشاد للحلول التقنية',
+                'value' => 'DAYANCO TRADING CO. LIMITED',
                 'description' => 'Company name for documents',
                 'created_at' => now(),
                 'updated_at' => now()
             ],
             [
                 'key' => 'company_address',
-                'value' => 'العنوان يحدد من إعدادات النظام',
+                'value' => 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA',
                 'description' => 'Company address for documents',
                 'created_at' => now(),
                 'updated_at' => now()
             ],
             [
                 'key' => 'company_phone',
-                'value' => '+967000000000',
+                'value' => '+86 188188 45411',
                 'description' => 'Company phone for documents',
                 'created_at' => now(),
                 'updated_at' => now()

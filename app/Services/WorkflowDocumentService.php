@@ -176,19 +176,19 @@ class WorkflowDocumentService
     private function companyProfile(): array
     {
         return [
-            'name' => (string) Setting::get('company_name', 'مؤسسة مدحت رشاد للحلول التقنية'),
-            'address' => (string) Setting::get('company_address', ''),
-            'phone' => (string) Setting::get('company_phone', ''),
-            'email' => (string) Setting::get('company_email', ''),
-            'attn' => (string) Setting::get('company_attn', ''),
-            'beneficiary_name' => (string) Setting::get('beneficiary_name', ''),
-            'beneficiary_bank' => (string) Setting::get('beneficiary_bank', ''),
-            'account_number' => (string) Setting::get('account_number', ''),
-            'swift_code' => (string) Setting::get('swift_code', ''),
-            'bank_address' => (string) Setting::get('bank_address', ''),
-            'beneficiary_address' => (string) Setting::get('beneficiary_address', ''),
-            'country' => (string) Setting::get('company_country', 'China'),
-            'payment_purpose' => (string) Setting::get('payment_purpose', 'PURCHASE OF GOODS'),
+            'name' => 'DAYANCO TRADING CO. LIMITED',
+            'address' => 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA',
+            'phone' => '+86 188188 45411',
+            'email' => 'team@dayancoofficial.com',
+            'attn' => 'Mr. Abdulmalek',
+            'beneficiary_name' => 'DAYANCO TRADING CO., LIMITED',
+            'beneficiary_bank' => 'ZHEJIANG CHOUZHOU COMMERCIAL BANK',
+            'account_number' => 'NRA15617142010500006871',
+            'swift_code' => 'CZCBCN2X',
+            'bank_address' => 'YIWU LEYUAN EAST, JIANGBIN RD, YIWU, ZHEJIANG, CHINA',
+            'beneficiary_address' => 'RM906, 9/F FLOOR, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000, P.R. CHINA',
+            'country' => 'China',
+            'payment_purpose' => 'PURCHASE OF GOODS',
         ];
     }
 

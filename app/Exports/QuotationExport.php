@@ -48,11 +48,11 @@ class QuotationExport implements FromArray, WithEvents, WithTitle
                 $custName  = optional($o->customer)->full_name ?? '?';
                 $orderNum  = $o->order_number;
                 $productName = $o->product_name;
-                $companyName = Setting::get('company_name', 'مؤسسة مدحت رشاد للحلول التقنية');
-                $companyAddress = Setting::get('company_address', 'يتم تحديد العنوان من لوحة الإعدادات');
-                $companyPhone = Setting::get('company_phone', '+967000000000');
-                $companyEmail = Setting::get('company_email', '');
-                $companyAttn = Setting::get('company_attn', 'الإدارة');
+                $companyName = 'DAYANCO TRADING CO. LIMITED';
+                $companyAddress = 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA';
+                $companyPhone = '+86 188188 45411';
+                $companyEmail = 'team@dayancoofficial.com';
+                $companyAttn = 'Mr. Abdulmalek';
 
                 $green  = 'D5E8D4';
                 $blue   = 'DAE8FC';
@@ -171,9 +171,9 @@ class QuotationExport implements FromArray, WithEvents, WithTitle
                 $ws->mergeCells('L8:M8');
                 $ws->setCellValue('L9', 'PALLETS');
                 $ws->setCellValue('M9', 'PCS');
-                $ws->setCellValue('N8', 'Unit Cost EXW China');
+                $ws->setCellValue('N8', 'Final Price USD');
                 $ws->mergeCells('N8:N9');
-                $ws->setCellValue('O8', 'Sub-total Cost (EXW China)');
+                $ws->setCellValue('O8', 'Sub-total USD');
                 $ws->mergeCells('O8:O9');
                 $ws->setCellValue('P8', 'Production Lead Time');
                 $ws->mergeCells('P8:P9');
