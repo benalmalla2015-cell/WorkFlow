@@ -48,7 +48,7 @@ class QuotationExport implements FromArray, WithEvents, WithTitle
                 $custName  = optional($o->customer)->full_name ?? '?';
                 $orderNum  = $o->order_number;
                 $productName = $o->product_name;
-                $companyName = 'DAYANCO TRADING CO. LIMITED';
+                $companyName = 'DAYANCO';
                 $companyAddress = 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA';
                 $companyPhone = '+86 188188 45411';
                 $companyEmail = 'team@dayancoofficial.com';

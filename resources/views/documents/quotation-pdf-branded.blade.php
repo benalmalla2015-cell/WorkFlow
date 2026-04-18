@@ -6,11 +6,11 @@
     $logoMarkup = $logoSvg !== '' ? $logoSvg : '<div class="brand-fallback">DAYANCO</div>';
     $placeholder = '—';
     $paymentDetails = [
-        'beneficiary_name' => $company['beneficiary_name'] ?: 'DAYANCO TRADING CO., LIMITED',
+        'beneficiary_name' => $company['beneficiary_name'] ?: 'DAYANCO',
         'beneficiary_bank' => $company['beneficiary_bank'] ?: 'ZHEJIANG CHOUZHOU COMMERCIAL BANK',
         'account_number' => $company['account_number'] ?: 'NRA15617142010500006871',
         'beneficiary_address' => $company['beneficiary_address'] ?: 'RM906, 9/F FLOOR, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA',
-        'bank_address' => $company['bank_address'] ?: 'YIWULEYUAN EAST, JIANGBIN RD, YIWU, ZHEJIANG, CHINA',
+        'bank_address' => $company['bank_address'] ?: 'YIWU LEYUAN EAST, JIANGBIN RD, YIWU, ZHEJIANG, CHINA',
         'swift_code' => $company['swift_code'] ?: 'CZCBCN2X',
         'country' => $company['country'] ?: 'China',
         'payment_purpose' => $company['payment_purpose'] ?: 'PURCHASE OF GOODS',
@@ -181,16 +181,13 @@
             <tr>
                 <td>
                     <div class="footer-note"><strong>Sales Representative:</strong> {{ $salesRepresentative ?: 'Sales Team' }}</div>
-                    <div class="footer-note"><strong>Generated:</strong> {{ $generatedAt->format('Y-m-d H:i') }} | <strong>Order:</strong> {{ $documentOrder['order_number'] }}</div>
-                    <div class="document-credentials"><strong>Prepared For:</strong> {{ $documentOrder['customer_name'] }}<br><strong>Document:</strong> Official DAYANCO Quotation</div>
+                    <div class="footer-note"><strong>Generated:</strong> {{ $generatedAt->format('Y-m-d H:i') }}</div>
                 </td>
                 <td style="width:36%; text-align:right;">
                     @if ($verificationQr)
                         <div class="verification-qr"><img src="{{ $verificationQr }}" alt="Verification QR"></div>
                     @endif
-                    <div class="verification-box"><strong>Verification Link:</strong> {{ $verificationUrl }}</div>
-                    <div class="verification-caption">Scan the QR code to verify the quotation reference online.</div>
-                    <div class="small-muted">Commercial quotation generated from WorkFlow with DAYANCO visual identity.</div>
+                    <div class="verification-caption">Scan to verify</div>
                 </td>
             </tr>
         </table>

@@ -42,8 +42,7 @@
         <tr>
             <td class="brand-block">
                 <div class="brand">DAYANCO®</div>
-                <div class="brand-sub">TRADING CO. LIMITED | Supply Chain Management</div>
-                <div class="brand-ar">شركة ديانكو التجارية المحدودة</div>
+                <div class="brand-sub">Supply Chain Management</div>
                 <div class="company-meta">
                     {{ $company['address'] ?: 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA' }}<br>
                     ATTN: {{ $company['attn'] ?: 'Mr. Abdulmalek' }} | {{ $company['phone'] ?: '+86 188188 45411' }} | {{ $company['email'] ?: 'team@dayancoofficial.com' }}
@@ -133,7 +132,7 @@
     </div>
 
     <div class="footer">
-        DAYANCO TRADING CO. LIMITED | شركة ديانكو التجارية المحدودة<br>
+        DAYANCO<br>
         {{ $company['email'] ?: 'team@dayancoofficial.com' }} | {{ $company['phone'] ?: '+86 188188 45411' }}
     </div>
 </body>

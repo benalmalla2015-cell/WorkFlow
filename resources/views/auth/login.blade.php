@@ -6,8 +6,8 @@
     <div class="card guest-card">
         <div class="card-body p-5">
             <div class="text-center mb-4">
-                <div class="h3 fw-bold text-primary">DAYANCO TRADING CO. LIMITED</div>
-                <div class="text-muted">نظام إدارة سير العمل | DAYANCO TRADING CO. LIMITED</div>
+                <div class="h3 fw-bold text-primary">DAYANCO</div>
+                <div class="text-muted">نظام إدارة سير العمل | DAYANCO</div>
             </div>
 
             @if (session('success'))

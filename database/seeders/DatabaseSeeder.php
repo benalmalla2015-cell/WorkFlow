@@ -90,12 +90,12 @@ class DatabaseSeeder extends Seeder
 
         $defaultSettings = [
             'default_profit_margin' => '20',
-            'company_name' => 'DAYANCO TRADING CO. LIMITED',
+            'company_name' => 'DAYANCO',
             'company_address' => 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA',
             'company_phone' => '+86 188188 45411',
             'company_email' => 'team@dayancoofficial.com',
             'company_attn' => 'Mr. Abdulmalek',
-            'beneficiary_name' => 'DAYANCO TRADING CO., LIMITED',
+            'beneficiary_name' => 'DAYANCO',
             'beneficiary_bank' => 'ZHEJIANG CHOUZHOU COMMERCIAL BANK',
             'account_number' => 'NRA15617142010500006871',
             'swift_code' => 'CZCBCN2X',

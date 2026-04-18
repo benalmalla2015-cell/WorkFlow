@@ -66,7 +66,7 @@ table.bank .bank-label { background:#d5e8d4; font-weight:bold; width:38%; }
   <table width="100%"><tr>
     <td valign="top" width="60%"></td>
     <td valign="top" width="40%" style="text-align:right;">
-      <div class="brand">DAYANCO<sup>®</sup> TRADING CO. LIMITED</div>
+      <div class="brand">DAYANCO<sup>®</sup></div>
       <div style="font-size:8pt;color:#555;">| Supply Chain Management |</div>
     </td>
   </tr></table>

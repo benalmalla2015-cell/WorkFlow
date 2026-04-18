@@ -7,7 +7,7 @@
         <div class="card-body p-5">
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
                 <div>
-                    <div class="display-6 fw-bold text-primary">DAYANCO TRADING CO. LIMITED</div>
+                    <div class="display-6 fw-bold text-primary">DAYANCO</div>
                     <div class="text-muted">التحقق من الوثيقة</div>
                 </div>
                 <span class="badge text-bg-success fs-6">تم التحقق</span>

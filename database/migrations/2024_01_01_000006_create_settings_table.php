@@ -29,7 +29,7 @@ return new class extends Migration
             ],
             [
                 'key' => 'company_name',
-                'value' => 'DAYANCO TRADING CO. LIMITED',
+                'value' => 'DAYANCO',
                 'description' => 'Company name for documents',
                 'created_at' => now(),
                 'updated_at' => now()
