@@ -5,6 +5,16 @@
     $logoSvg = file_exists($logoPath) ? file_get_contents($logoPath) : '';
     $logoMarkup = $logoSvg !== '' ? $logoSvg : '<div class="brand-fallback">DAYANCO</div>';
     $placeholder = '—';
+    $paymentDetails = [
+        'beneficiary_name' => $company['beneficiary_name'] ?: 'DAYANCO TRADING CO., LIMITED',
+        'beneficiary_bank' => $company['beneficiary_bank'] ?: 'ZHEJIANG CHOUZHOU COMMERCIAL BANK',
+        'account_number' => $company['account_number'] ?: 'NRA15617142010500006871',
+        'beneficiary_address' => $company['beneficiary_address'] ?: 'RM906, 9TH FLOOR, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA',
+        'bank_address' => $company['bank_address'] ?: 'YIWU, ZHEJIANG, CHINA',
+        'swift_code' => $company['swift_code'] ?: 'CZCBCN2X',
+        'country' => $company['country'] ?: 'China',
+        'payment_purpose' => $company['payment_purpose'] ?: 'PURCHASE OF GOODS',
+    ];
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -65,8 +75,8 @@
                     <th colspan="2" style="width:10%;">Packaging</th>
                     <th rowspan="2" style="width:6%;">Container</th>
                     <th colspan="2" style="width:7%;">Qty</th>
-                    <th rowspan="2" style="width:7%;">Unit Cost<br>USD</th>
-                    <th rowspan="2" style="width:8%;">Sub-total<br>USD</th>
+                    <th rowspan="2" style="width:7%;">Unit Price<br>USD</th>
+                    <th rowspan="2" style="width:8%;">Line Total<br>USD</th>
                     <th rowspan="2" style="width:6%;">Lead Time<br>Days</th>
                 </tr>
                 <tr class="subhead">
@@ -92,7 +102,7 @@
                         <td class="align-center">{{ $placeholder }}</td>
                         <td class="align-center">{{ $placeholder }}</td>
                         <td class="align-center">{{ number_format((float) $item['quantity']) }}</td>
-                        <td class="amount">{{ $totals['currency'] }} {{ number_format((float) $item['sales_price'], 2) }}</td>
+                        <td class="amount">{{ $totals['currency'] }} {{ number_format((float) $item['unit_price'], 2) }}</td>
                         <td class="amount">{{ $totals['currency'] }} {{ number_format((float) $item['line_total'], 2) }}</td>
                         <td class="align-center">{{ $documentOrder['production_days'] }}</td>
                     </tr>
@@ -102,7 +112,7 @@
                     </tr>
                 @endforelse
                 <tr class="accent-total">
-                    <td colspan="13" class="align-right">total</td>
+                    <td colspan="13" class="align-right">Grand Total</td>
                     <td class="amount">{{ $totals['currency'] }} {{ number_format((float) $totals['unit_price'], 2) }}</td>
                     <td class="amount">{{ $totals['currency'] }} {{ number_format((float) $totals['grand_total'], 2) }}</td>
                     <td class="align-center">{{ $documentOrder['production_days'] }}</td>
@@ -110,14 +120,77 @@
             </tbody>
         </table>
 
+        <div class="quote-summary-wrap">
+            <table class="summary-table">
+                <tr>
+                    <td class="label-cell">Quotation Subtotal</td>
+                    <td class="value-cell">{{ $totals['currency'] }} {{ number_format((float) $totals['subtotal'], 2) }}</td>
+                </tr>
+                <tr>
+                    <td class="label-cell">Tax / Additional Charges</td>
+                    <td class="value-cell">{{ $totals['currency'] }} {{ number_format((float) $totals['tax_amount'], 2) }}</td>
+                </tr>
+                <tr>
+                    <td class="grand-cell">Total Quotation Value</td>
+                    <td class="grand-cell value-cell">{{ $totals['currency'] }} {{ number_format((float) $totals['grand_total'], 2) }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="payment-block">
+            <div class="payment-section-title">Payment Method ( For USD remittance )</div>
+
+            <table class="payment-table">
+                <tr>
+                    <th>Beneficiary Name</th>
+                    <td>{{ $paymentDetails['beneficiary_name'] }}</td>
+                </tr>
+                <tr>
+                    <th>Beneficiary Bank</th>
+                    <td>{{ $paymentDetails['beneficiary_bank'] }}</td>
+                </tr>
+                <tr>
+                    <th>Beneficiary Account Numbers</th>
+                    <td>{{ $paymentDetails['account_number'] }}</td>
+                </tr>
+                <tr>
+                    <th>Beneficiary Address</th>
+                    <td>{{ $paymentDetails['beneficiary_address'] }}</td>
+                </tr>
+                <tr>
+                    <th>Bank Address</th>
+                    <td>{{ $paymentDetails['bank_address'] }}</td>
+                </tr>
+                <tr>
+                    <th>SWIFT</th>
+                    <td>{{ $paymentDetails['swift_code'] }}</td>
+                </tr>
+                <tr>
+                    <th>COUNTRY</th>
+                    <td>{{ $paymentDetails['country'] }}</td>
+                </tr>
+                <tr>
+                    <th>PURPOSE OF PAYMENTS</th>
+                    <td class="bank-purpose">{{ $paymentDetails['payment_purpose'] }}</td>
+                </tr>
+            </table>
+
+            <div class="remark-box">REMARK: PLEASE USE THE FULL BENEFICIARY NAME ABOVE WHEN REMITTING. THANK YOU.</div>
+        </div>
+
         <table class="footer-table">
             <tr>
                 <td>
                     <div class="footer-note"><strong>Sales Representative:</strong> {{ $salesRepresentative ?: 'Sales Team' }}</div>
                     <div class="footer-note"><strong>Generated:</strong> {{ $generatedAt->format('Y-m-d H:i') }} | <strong>Order:</strong> {{ $documentOrder['order_number'] }}</div>
+                    <div class="document-credentials"><strong>Prepared For:</strong> {{ $documentOrder['customer_name'] }}<br><strong>Document:</strong> Official DAYANCO Quotation</div>
                 </td>
                 <td style="width:36%; text-align:right;">
-                    <div class="verification-box"><strong>Verification:</strong> {{ $verificationUrl }}</div>
+                    @if ($verificationQr)
+                        <div class="verification-qr"><img src="{{ $verificationQr }}" alt="Verification QR"></div>
+                    @endif
+                    <div class="verification-box"><strong>Verification Link:</strong> {{ $verificationUrl }}</div>
+                    <div class="verification-caption">Scan the QR code to verify the quotation reference online.</div>
                     <div class="small-muted">Commercial quotation generated from WorkFlow with DAYANCO visual identity.</div>
                 </td>
             </tr>

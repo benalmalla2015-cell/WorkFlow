@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Setting;
 use App\Models\User;
 use App\Notifications\OrderStatusUpdatedNotification;
@@ -12,6 +13,7 @@ use App\Services\OrderChangeService;
 use App\Services\OrderPricingService;
 use App\Services\UserNotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\PermissionRegistrar;
@@ -29,51 +31,45 @@ class AdminPortalController extends Controller
 
     public function dashboard(Request $request)
     {
-        $ordersQuery = Order::withoutGlobalScopes()->with([
+        $orders = Order::withoutGlobalScopes()->with([
             'customer',
             'salesUser',
             'factoryUser',
             'items',
             'pendingChangeRequester',
             'pendingAdjustmentLog.requester',
-        ]);
-
-        if ($request->filled('status')) {
-            $ordersQuery->where('status', $request->string('status'));
-        } else {
-            $ordersQuery->whereIn('status', ['manager_review', 'pending_approval']);
-        }
-
-        $orders = $ordersQuery->orderByDesc('updated_at')->paginate(20)->withQueryString();
-        $allOrders = Order::withoutGlobalScopes()->with(['customer', 'salesUser', 'factoryUser', 'items'])->get();
-        $pendingApprovals = Order::withoutGlobalScopes()
-            ->with(['customer', 'salesUser', 'factoryUser', 'items'])
-            ->where('status', 'manager_review')
-            ->whereNull('pending_changes')
-            ->whereDoesntHave('pendingAdjustmentLog', fn ($query) => $query->where('status', 'pending'))
+        ])
             ->orderByDesc('updated_at')
             ->get();
-        $pendingChangeRequests = Order::withoutGlobalScopes()
-            ->with(['customer', 'salesUser', 'factoryUser', 'pendingChangeRequester', 'pendingAdjustmentLog.requester'])
-            ->where(function ($builder) {
-                $builder->whereNotNull('pending_changes')
-                    ->orWhereHas('pendingAdjustmentLog', fn ($query) => $query->where('status', 'pending'));
-            })
-            ->orderByDesc('pending_change_requested_at')
-            ->get();
+
+        $selectedGroup = (string) $request->string('group');
+
+        if ($selectedGroup === '' && $request->filled('status')) {
+            $selectedGroup = $this->dashboardGroupForStatus((string) $request->string('status'));
+        }
+
+        $groupedOrders = collect([
+            'new_pending' => $orders->filter(fn (Order $order) => $this->dashboardGroupForStatus($order->status) === 'new_pending')->values(),
+            'in_progress' => $orders->filter(fn (Order $order) => $this->dashboardGroupForStatus($order->status) === 'in_progress')->values(),
+            'approved' => $orders->filter(fn (Order $order) => $this->dashboardGroupForStatus($order->status) === 'approved')->values(),
+        ]);
+
+        $visibleGroups = $selectedGroup !== '' && $groupedOrders->has($selectedGroup)
+            ? collect([$selectedGroup => $groupedOrders->get($selectedGroup)])
+            : $groupedOrders;
+
+        $pendingChangeRequests = $orders->filter(fn (Order $order) => $order->hasPendingChanges())->values();
 
         return view('admin.dashboard', [
-            'orders' => $orders,
-            'pendingApprovals' => $pendingApprovals,
-            'pendingChangeRequests' => $pendingChangeRequests,
+            'groupedOrders' => $visibleGroups,
             'stats' => [
-                'total_orders' => $allOrders->count(),
-                'pending_orders' => $pendingApprovals->count() + $pendingChangeRequests->count(),
-                'pending_manager_reviews' => $pendingApprovals->count(),
+                'total_orders' => $orders->count(),
+                'new_pending' => $groupedOrders->get('new_pending')->count(),
+                'in_progress' => $groupedOrders->get('in_progress')->count(),
+                'approved' => $groupedOrders->get('approved')->count(),
                 'pending_adjustments' => $pendingChangeRequests->count(),
-                'default_profit_margin' => (float) Setting::get('default_profit_margin', 20),
             ],
-            'filters' => $request->only(['status']),
+            'filters' => ['group' => $selectedGroup],
         ]);
     }
 
@@ -121,9 +117,13 @@ class AdminPortalController extends Controller
             ]
             : (is_array($order->pending_changes) ? $order->pending_changes : []);
 
+        $pendingChanges = $this->normalizePendingReviewPayload($pendingChanges);
+
         return view('admin.orders.pending-change-review', [
             'order' => $order,
             'pendingChanges' => $pendingChanges,
+            'comparisonRows' => $this->buildPendingComparisonRows($pendingChanges['current'] ?? [], $pendingChanges['proposed'] ?? []),
+            'priceComparison' => $this->buildPendingPriceComparison($order, $pendingChanges['current'] ?? [], $pendingChanges['proposed'] ?? []),
         ]);
     }
 
@@ -583,6 +583,308 @@ class AdminPortalController extends Controller
             'users' => User::orderBy('name')->get(['id', 'name']),
             'filters' => $request->only(['user_id', 'action', 'date_from', 'date_to']),
         ]);
+    }
+
+    private function dashboardGroupForStatus(string $status): string
+    {
+        return match ($status) {
+            'sent_to_factory', 'factory_pricing' => 'in_progress',
+            'approved', 'customer_approved', 'payment_confirmed', 'completed' => 'approved',
+            default => 'new_pending',
+        };
+    }
+
+    private function normalizePendingReviewPayload(array $pendingChanges): array
+    {
+        $current = is_array($pendingChanges['current'] ?? null) ? $pendingChanges['current'] : [];
+        $proposed = is_array($pendingChanges['proposed'] ?? null) ? $pendingChanges['proposed'] : [];
+
+        if (!isset($current['order']) && is_array($current['fields'] ?? null)) {
+            $current['order'] = $current['fields'];
+        }
+
+        if (!isset($proposed['order']) && is_array($proposed['fields'] ?? null)) {
+            $proposed['order'] = $proposed['fields'];
+        }
+
+        $pendingChanges['current'] = $current;
+        $pendingChanges['proposed'] = $proposed;
+
+        return $pendingChanges;
+    }
+
+    private function buildPendingComparisonRows(array $current, array $proposed): array
+    {
+        $sections = [
+            'customer' => [
+                'full_name' => 'اسم العميل',
+                'address' => 'العنوان',
+                'phone' => 'رقم التواصل',
+                'email' => 'البريد الإلكتروني',
+            ],
+            'order' => [
+                'customer_name' => 'العميل على الطلب',
+                'product_name' => 'المنتج',
+                'quantity' => 'الكمية',
+                'specifications' => 'المواصفات',
+                'customer_notes' => 'ملاحظات العميل',
+                'production_days' => 'مدة الإنتاج',
+                'status' => 'الحالة',
+            ],
+        ];
+
+        $rows = [];
+
+        foreach ($sections as $section => $labels) {
+            $currentSection = is_array($current[$section] ?? null) ? $current[$section] : [];
+            $proposedSection = is_array($proposed[$section] ?? null) ? $proposed[$section] : [];
+
+            foreach ($labels as $field => $label) {
+                if (!Arr::exists($currentSection, $field) && !Arr::exists($proposedSection, $field)) {
+                    continue;
+                }
+
+                $currentValue = $currentSection[$field] ?? null;
+                $proposedValue = Arr::exists($proposedSection, $field)
+                    ? $proposedSection[$field]
+                    : $currentValue;
+
+                if ($currentValue == $proposedValue) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'label' => $label,
+                    'current' => $this->presentPendingComparisonValue($field, $currentValue),
+                    'proposed' => $this->presentPendingComparisonValue($field, $proposedValue),
+                ];
+            }
+        }
+
+        if (!empty($proposed['attachments']) && is_array($proposed['attachments'])) {
+            $rows[] = [
+                'label' => 'المرفقات الجديدة',
+                'current' => 'لا توجد مرفقات معلّقة',
+                'proposed' => count($proposed['attachments']) . ' ملف',
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function buildPendingPriceComparison(Order $order, array $current, array $proposed): array
+    {
+        $currentSummary = $this->pricing->summarize($order);
+        $previewOrder = $this->buildPreviewOrderFromPendingChange($order, $proposed);
+        $proposedSummary = $this->pricing->summarize($previewOrder);
+        $proposedPricingReady = !$this->pendingChangeRequiresRepricing($proposed)
+            && (bool) ($proposedSummary['has_complete_factory_item_pricing'] ?? false);
+        $currentTotal = round((float) (data_get($current, 'order.final_price') ?: $order->final_price ?: ($currentSummary['sales_total'] ?? 0)), 2);
+        $currentUnit = round((float) (($currentSummary['sales_unit_price_average'] ?? 0) ?: ($order->selling_price ?: 0)), 2);
+        $currentQuantity = max(1, (int) (($currentSummary['quantity'] ?? 0) ?: data_get($current, 'order.quantity') ?: $order->quantity ?: 1));
+        $proposedQuantity = max(1, (int) (($proposedSummary['quantity'] ?? 0) ?: data_get($proposed, 'order.quantity') ?: $currentQuantity));
+        $proposedTotal = $proposedPricingReady ? round((float) ($proposedSummary['sales_total'] ?? 0), 2) : null;
+        $proposedUnit = $proposedPricingReady ? round((float) ($proposedSummary['sales_unit_price_average'] ?? 0), 2) : null;
+
+        return [
+            'currency' => (string) Setting::get('currency', 'USD'),
+            'current_total' => $currentTotal > 0 ? $currentTotal : null,
+            'proposed_total' => $proposedTotal,
+            'current_unit' => $currentUnit > 0 ? $currentUnit : null,
+            'proposed_unit' => $proposedUnit,
+            'current_quantity' => $currentQuantity,
+            'proposed_quantity' => $proposedQuantity,
+            'current_production_days' => $this->presentPendingComparisonValue('production_days', data_get($current, 'order.production_days') ?: $order->production_days),
+            'proposed_production_days' => $this->presentPendingComparisonValue('production_days', data_get($proposed, 'order.production_days') ?: data_get($current, 'order.production_days') ?: $order->production_days),
+            'delta' => $proposedTotal !== null ? round($proposedTotal - $currentTotal, 2) : null,
+            'requires_repricing' => !$proposedPricingReady,
+            'note' => $proposedPricingReady
+                ? 'المقارنة أدناه تعرض السعر النهائي الحالي مقابل السعر النهائي المتوقع بعد اعتماد التعديل.'
+                : 'السعر النهائي المقترح سيظهر بعد اعتماد التعديل واكتمال أو إعادة تسعير المصنع.',
+            'current_items' => $this->buildPendingPricedItemRows($currentSummary['line_items'] ?? [], true),
+            'proposed_items' => $this->buildPendingPricedItemRows($proposedSummary['line_items'] ?? [], $proposedPricingReady),
+        ];
+    }
+
+    private function buildPendingPricedItemRows(array $lineItems, bool $includePricing): array
+    {
+        return collect($lineItems)
+            ->map(function (array $item) use ($includePricing) {
+                return [
+                    'item_name' => (string) ($item['item_name'] ?? '—'),
+                    'quantity' => max(1, (int) ($item['quantity'] ?? 1)),
+                    'description' => (string) ($item['description'] ?? ''),
+                    'final_unit_price' => $includePricing ? round((float) ($item['sales_price'] ?? 0), 2) : null,
+                    'final_line_total' => $includePricing ? round((float) ($item['sales_total'] ?? 0), 2) : null,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function buildPreviewOrderFromPendingChange(Order $order, array $proposed): Order
+    {
+        $previewOrder = $order->replicate();
+        $previewOrder->profit_margin_percentage = (float) ($order->profit_margin_percentage ?: Setting::get('default_profit_margin', 20));
+        $previewOrder->production_days = data_get($proposed, 'order.production_days') ?: $order->production_days;
+
+        foreach (['customer_name', 'product_name', 'quantity', 'specifications', 'customer_notes', 'status'] as $field) {
+            if (Arr::has($proposed, 'order.' . $field)) {
+                $previewOrder->{$field} = data_get($proposed, 'order.' . $field);
+            }
+        }
+
+        $currentItems = $order->resolvedItems()->values()->map(fn ($item) => $this->makePreviewOrderItem($item))->values();
+        $proposedItems = is_array($proposed['items'] ?? null) ? array_values($proposed['items']) : [];
+
+        if ($proposedItems !== []) {
+            if ($this->isFactoryPendingItemPayload($proposedItems)) {
+                $candidates = collect($proposedItems)->values();
+                $currentItems = $currentItems->values()->map(function (OrderItem $item, int $index) use ($candidates) {
+                    $matched = $candidates->first(function ($candidate, int $candidateIndex) use ($item, $index) {
+                        if (!is_array($candidate)) {
+                            return false;
+                        }
+
+                        $candidateId = (int) ($candidate['id'] ?? 0);
+
+                        return ($candidateId > 0 && (int) ($item->id ?? 0) === $candidateId)
+                            || ($candidateId === 0 && $candidateIndex === $index);
+                    });
+
+                    return $this->makePreviewOrderItem(
+                        $item,
+                        Arr::only(is_array($matched) ? $matched : [], ['supplier_name', 'product_code', 'unit_cost'])
+                    );
+                })->values();
+            } else {
+                $baseItems = $order->resolvedItems()->values();
+                $currentItems = collect($proposedItems)
+                    ->values()
+                    ->map(function ($itemData, int $index) use ($baseItems) {
+                        $baseItem = $baseItems->get($index);
+                        $overrides = Arr::only(is_array($itemData) ? $itemData : [], ['item_name', 'quantity', 'description']);
+                        $overrides['supplier_name'] = null;
+                        $overrides['product_code'] = null;
+                        $overrides['unit_cost'] = null;
+
+                        return $this->makePreviewOrderItem(
+                            $baseItem instanceof OrderItem ? $baseItem : null,
+                            $overrides
+                        );
+                    })
+                    ->values();
+            }
+        } elseif ($currentItems->count() === 1) {
+            $singleItemOverrides = [];
+
+            foreach (['product_name' => 'item_name', 'quantity' => 'quantity', 'specifications' => 'description'] as $orderField => $itemField) {
+                if (Arr::has($proposed, 'order.' . $orderField)) {
+                    $singleItemOverrides[$itemField] = data_get($proposed, 'order.' . $orderField);
+                }
+            }
+
+            if ($singleItemOverrides !== []) {
+                $singleItemOverrides['supplier_name'] = null;
+                $singleItemOverrides['product_code'] = null;
+                $singleItemOverrides['unit_cost'] = null;
+                $currentItems = collect([
+                    $this->makePreviewOrderItem($currentItems->first(), $singleItemOverrides),
+                ]);
+            }
+        }
+
+        $previewOrder->setRelation('items', $currentItems);
+
+        return $previewOrder;
+    }
+
+    private function isFactoryPendingItemPayload(array $items): bool
+    {
+        return collect($items)->contains(function ($item) {
+            return is_array($item)
+                && (array_key_exists('unit_cost', $item)
+                    || array_key_exists('supplier_name', $item)
+                    || array_key_exists('product_code', $item));
+        });
+    }
+
+    private function pendingChangeRequiresRepricing(array $proposed): bool
+    {
+        $proposedItems = is_array($proposed['items'] ?? null) ? $proposed['items'] : [];
+
+        if ($proposedItems !== [] && !$this->isFactoryPendingItemPayload($proposedItems)) {
+            return true;
+        }
+
+        foreach (['product_name', 'quantity', 'specifications'] as $field) {
+            if (Arr::has($proposed, 'order.' . $field)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function makePreviewOrderItem(OrderItem|array|null $baseItem, array $overrides = []): OrderItem
+    {
+        $data = [
+            'id' => $baseItem instanceof OrderItem ? $baseItem->id : (is_array($baseItem) ? ($baseItem['id'] ?? null) : null),
+            'item_name' => $baseItem instanceof OrderItem ? $baseItem->item_name : (is_array($baseItem) ? ($baseItem['item_name'] ?? '') : ''),
+            'quantity' => $baseItem instanceof OrderItem ? $baseItem->quantity : (is_array($baseItem) ? ($baseItem['quantity'] ?? 1) : 1),
+            'description' => $baseItem instanceof OrderItem ? $baseItem->description : (is_array($baseItem) ? ($baseItem['description'] ?? '') : ''),
+            'supplier_name' => $baseItem instanceof OrderItem ? $baseItem->supplier_name : (is_array($baseItem) ? ($baseItem['supplier_name'] ?? null) : null),
+            'product_code' => $baseItem instanceof OrderItem ? $baseItem->product_code : (is_array($baseItem) ? ($baseItem['product_code'] ?? null) : null),
+            'unit_cost' => $baseItem instanceof OrderItem ? $baseItem->unit_cost : (is_array($baseItem) ? ($baseItem['unit_cost'] ?? null) : null),
+        ];
+
+        $data = array_merge($data, $overrides);
+        $item = new OrderItem();
+
+        if (!empty($data['id'])) {
+            $item->id = (int) $data['id'];
+        }
+
+        $item->item_name = (string) ($data['item_name'] ?? '');
+        $item->quantity = max(1, (int) ($data['quantity'] ?? 1));
+        $item->description = (string) ($data['description'] ?? '');
+        $item->supplier_name = filled($data['supplier_name'] ?? null) ? (string) $data['supplier_name'] : null;
+        $item->product_code = filled($data['product_code'] ?? null) ? (string) $data['product_code'] : null;
+        $item->unit_cost = filled($data['unit_cost'] ?? null) ? (float) $data['unit_cost'] : null;
+
+        return $item;
+    }
+
+    private function presentPendingComparisonValue(string $field, mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '—';
+        }
+
+        if ($field === 'status') {
+            return match ((string) $value) {
+                'draft' => 'جديد',
+                'sent_to_factory' => 'تم الإرسال إلى المصنع',
+                'factory_pricing' => 'عاد لتعديل تشغيلي',
+                'manager_review' => 'قيد مراجعة المدير',
+                'pending_approval' => 'طلب تعديل بانتظار الاعتماد',
+                'approved' => 'معتمد',
+                'customer_approved' => 'موافقة العميل مسجلة',
+                'payment_confirmed' => 'تم تأكيد الدفع',
+                'completed' => 'مكتمل',
+                default => (string) $value,
+            };
+        }
+
+        if ($field === 'production_days' && is_numeric($value)) {
+            return number_format((float) $value) . ' يوم';
+        }
+
+        if ($field === 'quantity' && is_numeric($value)) {
+            return number_format((float) $value);
+        }
+
+        return is_scalar($value) ? (string) $value : '—';
     }
 
     private function validateUser(Request $request, ?User $user): array

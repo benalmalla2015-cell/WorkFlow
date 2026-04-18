@@ -28,15 +28,15 @@
         .section-title { font-weight: 700; margin-bottom: 1rem; }
         .table thead th { background: #f8fafc; color: #334155; font-size: .88rem; white-space: nowrap; }
         .badge-status { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 12px; font-size: .78rem; font-weight: 700; }
-        .status-draft { background: #e2e8f0; color: #334155; }
-        .status-sent_to_factory { background: #dbeafe; color: #1e40af; }
-        .status-factory_pricing { background: #dbeafe; color: #1d4ed8; }
-        .status-manager_review { background: #fef3c7; color: #b45309; }
-        .status-pending_approval { background: #fee2e2; color: #b91c1c; }
-        .status-approved { background: #dcfce7; color: #15803d; }
-        .status-customer_approved { background: #cffafe; color: #0f766e; }
-        .status-payment_confirmed { background: #d1fae5; color: #047857; }
-        .status-completed { background: #ede9fe; color: #6d28d9; }
+        .status-draft { background: #eef3fb; color: #113f87; }
+        .status-sent_to_factory { background: #f8ecd0; color: #7a5600; }
+        .status-factory_pricing { background: #f5ecd2; color: #8a5b00; }
+        .status-manager_review { background: #e7eef9; color: #113f87; }
+        .status-pending_approval { background: #f8ecd0; color: #7a5600; }
+        .status-approved { background: #dbe8fb; color: #113f87; }
+        .status-customer_approved { background: #e7eef9; color: #0f2f6f; }
+        .status-payment_confirmed { background: #eef3fb; color: #113f87; }
+        .status-completed { background: #f5ecd2; color: #7a5600; }
         .form-card { border: 0; border-radius: 18px; box-shadow: 0 12px 34px rgba(15, 23, 42, .06); }
         .attachment-list a { text-decoration: none; }
         .chart-card canvas { max-height: 320px; }

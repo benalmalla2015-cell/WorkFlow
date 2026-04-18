@@ -6,6 +6,16 @@
     $logoMarkup = $logoSvg !== '' ? $logoSvg : '<div class="brand-fallback">DAYANCO</div>';
     $bankFee = 40.00;
     $balanceDue = round((float) $totals['grand_total'] * 0.70, 2);
+    $paymentDetails = [
+        'beneficiary_name' => $company['beneficiary_name'] ?: 'DAYANCO TRADING CO., LIMITED',
+        'beneficiary_bank' => $company['beneficiary_bank'] ?: 'ZHEJIANG CHOUZHOU COMMERCIAL BANK',
+        'account_number' => $company['account_number'] ?: 'NRA15617142010500006871',
+        'beneficiary_address' => $company['beneficiary_address'] ?: 'RM906, 9TH FLOOR, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA',
+        'bank_address' => $company['bank_address'] ?: 'YIWU, ZHEJIANG, CHINA',
+        'swift_code' => $company['swift_code'] ?: 'CZCBCN2X',
+        'country' => $company['country'] ?: 'China',
+        'payment_purpose' => $company['payment_purpose'] ?: 'PURCHASE OF GOODS',
+    ];
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -104,35 +114,35 @@
         <table class="payment-table">
             <tr>
                 <th>Beneficiary Name</th>
-                <td>{{ $company['beneficiary_name'] ?: 'DAYANCO TRADING CO., LIMITED' }}</td>
+                <td>{{ $paymentDetails['beneficiary_name'] }}</td>
             </tr>
             <tr>
                 <th>Beneficiary Bank</th>
-                <td>{{ $company['beneficiary_bank'] ?: 'ZHEJIANG CHOUZHOU COMMERCIAL BANK' }}</td>
+                <td>{{ $paymentDetails['beneficiary_bank'] }}</td>
             </tr>
             <tr>
                 <th>Beneficiary Account Numbers</th>
-                <td>{{ $company['account_number'] ?: 'NRA15617142010500006871' }}</td>
+                <td>{{ $paymentDetails['account_number'] }}</td>
             </tr>
             <tr>
                 <th>Beneficiary Address</th>
-                <td>{{ $company['beneficiary_address'] ?: 'RM906, 9TH FLOOR, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA' }}</td>
+                <td>{{ $paymentDetails['beneficiary_address'] }}</td>
             </tr>
             <tr>
                 <th>Bank Address</th>
-                <td>{{ $company['bank_address'] ?: 'YIWU, ZHEJIANG, CHINA' }}</td>
+                <td>{{ $paymentDetails['bank_address'] }}</td>
             </tr>
             <tr>
                 <th>SWIFT</th>
-                <td>{{ $company['swift_code'] ?: 'CZCBCN2X' }}</td>
+                <td>{{ $paymentDetails['swift_code'] }}</td>
             </tr>
             <tr>
                 <th>COUNTRY</th>
-                <td>{{ $company['country'] ?: 'China' }}</td>
+                <td>{{ $paymentDetails['country'] }}</td>
             </tr>
             <tr>
                 <th>PURPOSE OF PAYMENTS</th>
-                <td class="bank-purpose">{{ $company['payment_purpose'] ?: 'PURCHASE OF GOODS' }}</td>
+                <td class="bank-purpose">{{ $paymentDetails['payment_purpose'] }}</td>
             </tr>
         </table>
 
@@ -143,9 +153,14 @@
                 <td>
                     <div class="footer-note"><strong>Sales Representative:</strong> {{ $salesRepresentative ?: 'Sales Team' }}</div>
                     <div class="footer-note"><strong>Generated:</strong> {{ $generatedAt->format('Y-m-d H:i') }}</div>
+                    <div class="document-credentials"><strong>Prepared For:</strong> {{ $documentOrder['customer_name'] }}<br><strong>Document:</strong> Official DAYANCO Invoice</div>
                 </td>
                 <td style="width:36%; text-align:right;">
-                    <div class="verification-box"><strong>Verification:</strong> {{ $verificationUrl }}</div>
+                    @if ($verificationQr)
+                        <div class="verification-qr"><img src="{{ $verificationQr }}" alt="Verification QR"></div>
+                    @endif
+                    <div class="verification-box"><strong>Verification Link:</strong> {{ $verificationUrl }}</div>
+                    <div class="verification-caption">Scan the QR code to verify the invoice reference online.</div>
                     <div class="small-muted">DAYANCO commercial invoice generated from WorkFlow.</div>
                 </td>
             </tr>

@@ -5,9 +5,9 @@
 @php
     $current = $pendingChanges['current'] ?? [];
     $proposed = $pendingChanges['proposed'] ?? [];
-    $rawChangedFields = $pendingChanges['changed_fields'] ?? [];
     $pendingRequester = is_array($pendingChanges['requested_by'] ?? null) ? $pendingChanges['requested_by'] : [];
     $requester = $order->pendingAdjustmentLog?->requester ?: $order->pendingChangeRequester;
+    $requestSubmittedAt = $order->pending_change_requested_at ?: $order->pendingAdjustmentLog?->created_at;
     $roleLabels = [
         'admin' => 'الإدارة',
         'sales' => 'المبيعات',
@@ -24,82 +24,85 @@
         'payment_confirmed' => 'تم تأكيد الدفع',
         'completed' => 'مكتمل',
     ];
-    $customerLabels = [
-        'full_name' => 'اسم العميل',
-        'address' => 'العنوان',
-        'phone' => 'رقم التواصل',
-        'email' => 'البريد الإلكتروني',
-    ];
-    $orderLabels = [
-        'customer_name' => 'العميل على الطلب',
-        'product_name' => 'المنتج',
-        'quantity' => 'الكمية',
-        'specifications' => 'المواصفات',
-        'customer_notes' => 'ملاحظات العميل',
-        'supplier_name' => 'اسم المورد',
-        'product_code' => 'كود المنتج',
-        'factory_cost' => 'تكلفة المصنع',
-        'production_days' => 'مدة الإنتاج',
-        'selling_price' => 'سعر البيع',
-        'profit_margin_percentage' => 'الهامش',
-        'final_price' => 'السعر النهائي',
-        'status' => 'الحالة',
-        'factory_user_id' => 'معرف موظف المصنع',
-    ];
-    $changeFieldLabels = [
-        'customer.full_name' => 'اسم العميل',
-        'customer.address' => 'العنوان',
-        'customer.phone' => 'رقم التواصل',
-        'customer.email' => 'البريد الإلكتروني',
-        'order.customer_name' => 'العميل على الطلب',
-        'order.product_name' => 'المنتج',
-        'order.quantity' => 'الكمية',
-        'order.specifications' => 'المواصفات',
-        'order.customer_notes' => 'ملاحظات العميل',
-        'order.supplier_name' => 'اسم المورد',
-        'order.product_code' => 'كود المنتج',
-        'order.factory_cost' => 'تكلفة المصنع',
-        'order.production_days' => 'مدة الإنتاج',
-        'order.selling_price' => 'سعر البيع',
-        'order.profit_margin_percentage' => 'الهامش',
-        'order.final_price' => 'السعر النهائي',
-        'order.status' => 'الحالة',
-        'order.factory_user_id' => 'مسؤول المصنع',
-    ];
-    $changedFields = collect($rawChangedFields)
-        ->map(function ($field) use ($changeFieldLabels) {
-            if (isset($changeFieldLabels[$field])) {
-                return $changeFieldLabels[$field];
-            }
-
-            if (preg_match('/^items\.\d+\./', $field)) {
-                return 'عناصر الطلب';
-            }
-
-            if (preg_match('/^attachments\.\d+\.(original_name|file_name)$/', $field)) {
-                return 'المرفقات';
-            }
-
-            if (preg_match('/^attachments\.\d+\./', $field)) {
-                return null;
-            }
-
-            return str($field)
-                ->replace(['order.', 'customer.'], '')
-                ->replace('_', ' ')
-                ->title()
-                ->toString();
-        })
-        ->filter()
-        ->unique()
-        ->values();
+    $proposedAttachments = is_array($proposed['attachments'] ?? null) ? $proposed['attachments'] : [];
+    $formatMoney = function ($value) use ($priceComparison) {
+        return $value === null
+            ? 'بانتظار إعادة التسعير'
+            : ($priceComparison['currency'] ?? 'USD') . ' ' . number_format((float) $value, 2);
+    };
+    $deltaLabel = $priceComparison['delta'] === null
+        ? 'بانتظار إعادة التسعير'
+        : ((float) $priceComparison['delta'] === 0.0
+            ? 'لا يوجد تغير في السعر النهائي'
+            : ((float) $priceComparison['delta'] > 0
+                ? 'زيادة ' . ($priceComparison['currency'] ?? 'USD') . ' ' . number_format((float) $priceComparison['delta'], 2)
+                : 'انخفاض ' . ($priceComparison['currency'] ?? 'USD') . ' ' . number_format(abs((float) $priceComparison['delta']), 2)));
 @endphp
+
+@push('styles')
+    <style>
+        .review-metric-card {
+            border: 0;
+            border-radius: 18px;
+            box-shadow: 0 12px 34px rgba(15, 23, 42, .06);
+        }
+
+        .review-metric-label {
+            color: #64748b;
+            font-size: .82rem;
+            margin-bottom: .4rem;
+        }
+
+        .review-metric-value {
+            font-weight: 800;
+            color: #0f2f6f;
+        }
+
+        .review-table thead th {
+            background: #f8fafc;
+            color: #0f2f6f;
+            font-weight: 700;
+        }
+
+        .review-table tbody td {
+            vertical-align: middle;
+        }
+
+        .review-pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: .8rem;
+            font-weight: 700;
+        }
+
+        .review-pill.blue {
+            background: #e7eef9;
+            color: #113f87;
+        }
+
+        .review-pill.gold {
+            background: #f8ecd0;
+            color: #7a5600;
+        }
+
+        .review-empty {
+            border: 1px dashed #cbd5e1;
+            border-radius: 18px;
+            padding: 18px;
+            text-align: center;
+            color: #64748b;
+            background: #f8fafc;
+        }
+    </style>
+@endpush
 
 @section('content')
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
         <div>
             <h1 class="h3 mb-1">مراجعة تعديل معلّق للطلب {{ $order->order_number }}</h1>
-            <div class="text-muted">مقارنة البيانات الحالية مع التعديلات المقترحة قبل تثبيت أي تغيير على السجل الأصلي.</div>
+            <div class="text-muted">عرض إداري نظيف للفروقات الفعلية، مع مقارنة السعر النهائي فقط دون أي تكلفة مصنع أو بيانات خام.</div>
         </div>
         <div class="d-flex align-items-center gap-2">
             <span class="badge-status status-{{ $order->status }}">{{ $order->status_label }}</span>
@@ -107,26 +110,121 @@
         </div>
     </div>
 
-    <div class="card page-card mb-4">
-        <div class="card-body">
-            <div class="row g-3 align-items-start">
-                <div class="col-lg-4">
-                    <div class="fw-semibold mb-1">مقدم الطلب</div>
-                    <div>{{ $requester?->name ?: ($pendingRequester['name'] ?? '—') }}</div>
-                    <div class="text-muted small">{{ $roleLabels[$requester?->role ?: ($pendingRequester['role'] ?? '')] ?? '—' }}</div>
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card review-metric-card h-100">
+                <div class="card-body">
+                    <div class="review-metric-label">مقدم الطلب</div>
+                    <div class="review-metric-value">{{ $requester?->name ?: ($pendingRequester['name'] ?? '—') }}</div>
+                    <div class="text-muted small mt-2">{{ $roleLabels[$requester?->role ?: ($pendingRequester['role'] ?? '')] ?? '—' }}</div>
                 </div>
-                <div class="col-lg-4">
-                    <div class="fw-semibold mb-1">وقت الطلب</div>
-                    <div>{{ $order->pending_change_requested_at?->format('Y-m-d H:i:s') ?: '—' }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card review-metric-card h-100">
+                <div class="card-body">
+                    <div class="review-metric-label">وقت الطلب</div>
+                    <div class="review-metric-value">{{ $requestSubmittedAt?->format('Y-m-d H:i:s') ?: '—' }}</div>
                 </div>
-                <div class="col-lg-4">
-                    <div class="fw-semibold mb-1">الحالة قبل الطلب</div>
-                    <div>{{ $statusLabels[$pendingChanges['previous_status'] ?? ''] ?? '—' }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card review-metric-card h-100">
+                <div class="card-body">
+                    <div class="review-metric-label">الحالة قبل الطلب</div>
+                    <div class="review-metric-value">{{ $statusLabels[$pendingChanges['previous_status'] ?? ''] ?? '—' }}</div>
                 </div>
-                <div class="col-lg-4">
-                    <div class="fw-semibold mb-1">الحالة بعد الاعتماد</div>
-                    <div>{{ $statusLabels[$pendingChanges['target_status'] ?? ''] ?? '—' }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card review-metric-card h-100">
+                <div class="card-body">
+                    <div class="review-metric-label">الحالة بعد الاعتماد</div>
+                    <div class="review-metric-value">{{ $statusLabels[$pendingChanges['target_status'] ?? ''] ?? '—' }}</div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card form-card mb-4">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                <div>
+                    <h2 class="h5 section-title mb-1">الفروقات المعروضة للإدارة</h2>
+                    <div class="text-muted small">جميع السطور التالية معروضة بصيغة بشرية واضحة، بدون حقول داخلية أو JSON.</div>
+                </div>
+                <span class="review-pill blue">{{ count($comparisonRows) }} تغيير واضح</span>
+            </div>
+
+            @if ($comparisonRows !== [])
+                <div class="table-responsive">
+                    <table class="table review-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:24%;">الحقل</th>
+                                <th>القيمة الحالية</th>
+                                <th>القيمة المقترحة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($comparisonRows as $row)
+                                <tr>
+                                    <td class="fw-semibold">{{ $row['label'] }}</td>
+                                    <td>{{ $row['current'] }}</td>
+                                    <td>{{ $row['proposed'] }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="review-empty">لا توجد فروقات نصية مباشرة، وقد يكون التغيير متعلقًا بالعناصر أو بالمرفقات فقط.</div>
+            @endif
+        </div>
+    </div>
+
+    <div class="card form-card mb-4">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                <div>
+                    <h2 class="h5 section-title mb-1">مقارنة السعر النهائي</h2>
+                    <div class="text-muted small">{{ $priceComparison['note'] }}</div>
+                </div>
+                <span class="review-pill {{ $priceComparison['requires_repricing'] ? 'gold' : 'blue' }}">{{ $deltaLabel }}</span>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table review-table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:24%;">المعيار</th>
+                            <th>الحالي</th>
+                            <th>المقترح</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="fw-semibold">إجمالي السعر النهائي</td>
+                            <td>{{ $formatMoney($priceComparison['current_total']) }}</td>
+                            <td>{{ $formatMoney($priceComparison['proposed_total']) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-semibold">سعر الوحدة النهائي</td>
+                            <td>{{ $formatMoney($priceComparison['current_unit']) }}</td>
+                            <td>{{ $formatMoney($priceComparison['proposed_unit']) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-semibold">الكمية</td>
+                            <td>{{ number_format((int) $priceComparison['current_quantity']) }}</td>
+                            <td>{{ number_format((int) $priceComparison['proposed_quantity']) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-semibold">مدة الإنتاج</td>
+                            <td>{{ $priceComparison['current_production_days'] }}</td>
+                            <td>{{ $priceComparison['proposed_production_days'] }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -135,56 +233,34 @@
         <div class="col-lg-6">
             <div class="card form-card h-100">
                 <div class="card-body p-4">
-                    <h2 class="h5 section-title">البيانات الحالية</h2>
-
-                    @if (!empty($current['customer']))
-                        <div class="mb-4">
-                            <div class="fw-semibold mb-2">بيانات العميل</div>
-                            <dl class="row mb-0">
-                                @foreach ($current['customer'] as $key => $value)
-                                    <dt class="col-sm-4">{{ $customerLabels[$key] ?? $key }}</dt>
-                                    <dd class="col-sm-8">{{ filled($value) ? $value : '—' }}</dd>
-                                @endforeach
-                            </dl>
-                        </div>
-                    @endif
-
-                    @if (!empty($current['order']))
-                        <div class="mb-4">
-                            <div class="fw-semibold mb-2">بيانات الطلب</div>
-                            <dl class="row mb-0">
-                                @foreach ($current['order'] as $key => $value)
-                                    <dt class="col-sm-4">{{ $orderLabels[$key] ?? $key }}</dt>
-                                    <dd class="col-sm-8">{{ filled($value) ? $value : '—' }}</dd>
-                                @endforeach
-                            </dl>
-                        </div>
-                    @endif
-
-                    @if (!empty($current['items']))
-                        <div>
-                            <div class="fw-semibold mb-2">العناصر الحالية</div>
-                            <div class="table-responsive">
-                                <table class="table align-middle mb-0">
-                                    <thead>
+                    <h2 class="h5 section-title">العناصر الحالية</h2>
+                    @if (($priceComparison['current_items'] ?? []) !== [])
+                        <div class="table-responsive">
+                            <table class="table review-table align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>العنصر</th>
+                                        <th>الكمية</th>
+                                        <th>الوصف</th>
+                                        <th>سعر نهائي للوحدة</th>
+                                        <th>الإجمالي النهائي</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($priceComparison['current_items'] as $item)
                                         <tr>
-                                            <th>العنصر</th>
-                                            <th>الكمية</th>
-                                            <th>الوصف</th>
+                                            <td class="fw-semibold">{{ $item['item_name'] }}</td>
+                                            <td>{{ number_format((int) $item['quantity']) }}</td>
+                                            <td>{{ $item['description'] ?: '—' }}</td>
+                                            <td>{{ $formatMoney($item['final_unit_price']) }}</td>
+                                            <td>{{ $formatMoney($item['final_line_total']) }}</td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($current['items'] as $item)
-                                            <tr>
-                                                <td>{{ $item['item_name'] ?? '—' }}</td>
-                                                <td>{{ $item['quantity'] ?? '—' }}</td>
-                                                <td>{{ $item['description'] ?? '—' }}</td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
+                                    @endforeach
+                                </tbody>
+                            </table>
                         </div>
+                    @else
+                        <div class="review-empty">لا توجد عناصر حالية قابلة للعرض.</div>
                     @endif
                 </div>
             </div>
@@ -193,75 +269,55 @@
         <div class="col-lg-6">
             <div class="card form-card h-100 border border-primary-subtle">
                 <div class="card-body p-4">
-                    <h2 class="h5 section-title text-primary">التعديلات المقترحة</h2>
-
-                    @if (!empty($proposed['customer']))
-                        <div class="mb-4">
-                            <div class="fw-semibold mb-2">بيانات العميل المقترحة</div>
-                            <dl class="row mb-0">
-                                @foreach ($proposed['customer'] as $key => $value)
-                                    <dt class="col-sm-4">{{ $customerLabels[$key] ?? $key }}</dt>
-                                    <dd class="col-sm-8">{{ filled($value) ? $value : '—' }}</dd>
-                                @endforeach
-                            </dl>
-                        </div>
-                    @endif
-
-                    @if (!empty($proposed['order']))
-                        <div class="mb-4">
-                            <div class="fw-semibold mb-2">بيانات الطلب المقترحة</div>
-                            <dl class="row mb-0">
-                                @foreach ($proposed['order'] as $key => $value)
-                                    <dt class="col-sm-4">{{ $orderLabels[$key] ?? $key }}</dt>
-                                    <dd class="col-sm-8">{{ filled($value) ? $value : '—' }}</dd>
-                                @endforeach
-                            </dl>
-                        </div>
-                    @endif
-
-                    @if (!empty($proposed['items']))
-                        <div class="mb-4">
-                            <div class="fw-semibold mb-2">العناصر المقترحة</div>
-                            <div class="table-responsive">
-                                <table class="table align-middle mb-0">
-                                    <thead>
+                    <h2 class="h5 section-title text-primary">العناصر المقترحة</h2>
+                    @if (($priceComparison['proposed_items'] ?? []) !== [])
+                        <div class="table-responsive">
+                            <table class="table review-table align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>العنصر</th>
+                                        <th>الكمية</th>
+                                        <th>الوصف</th>
+                                        <th>سعر نهائي للوحدة</th>
+                                        <th>الإجمالي النهائي</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($priceComparison['proposed_items'] as $item)
                                         <tr>
-                                            <th>العنصر</th>
-                                            <th>الكمية</th>
-                                            <th>الوصف</th>
+                                            <td class="fw-semibold">{{ $item['item_name'] }}</td>
+                                            <td>{{ number_format((int) $item['quantity']) }}</td>
+                                            <td>{{ $item['description'] ?: '—' }}</td>
+                                            <td>{{ $formatMoney($item['final_unit_price']) }}</td>
+                                            <td>{{ $formatMoney($item['final_line_total']) }}</td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($proposed['items'] as $item)
-                                            <tr>
-                                                <td>{{ $item['item_name'] ?? '—' }}</td>
-                                                <td>{{ $item['quantity'] ?? '—' }}</td>
-                                                <td>{{ $item['description'] ?? '—' }}</td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
+                                    @endforeach
+                                </tbody>
+                            </table>
                         </div>
-                    @endif
-
-                    @if (!empty($proposed['attachments']))
-                        <div>
-                            <div class="fw-semibold mb-2">مرفقات جديدة بانتظار التثبيت</div>
-                            <div class="list-group list-group-flush">
-                                @foreach ($proposed['attachments'] as $attachment)
-                                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                        <span>{{ $attachment['original_name'] ?? 'attachment' }}</span>
-                                        <span class="text-muted small">{{ strtoupper(pathinfo($attachment['original_name'] ?? '', PATHINFO_EXTENSION)) }}</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
+                    @else
+                        <div class="review-empty">لا توجد عناصر مقترحة قابلة للعرض.</div>
                     @endif
                 </div>
             </div>
         </div>
     </div>
+
+    @if ($proposedAttachments !== [])
+        <div class="card form-card mb-4">
+            <div class="card-body p-4">
+                <h2 class="h5 section-title">المرفقات الجديدة بانتظار التثبيت</h2>
+                <div class="list-group list-group-flush">
+                    @foreach ($proposedAttachments as $attachment)
+                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span>{{ $attachment['original_name'] ?? 'attachment' }}</span>
+                            <span class="text-muted small">{{ strtoupper(pathinfo($attachment['original_name'] ?? '', PATHINFO_EXTENSION)) }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    @endif
 
     <div class="row g-4">
         <div class="col-lg-6">

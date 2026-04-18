@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
 use Illuminate\Validation\ValidationException;
 use Mpdf\Mpdf;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class WorkflowDocumentService
 {
@@ -105,8 +106,7 @@ class WorkflowDocumentService
                     'description' => (string) ($item['description'] ?? ''),
                     'supplier_name' => (string) ($item['supplier_name'] ?? ''),
                     'product_code' => (string) ($item['product_code'] ?? ''),
-                    'unit_cost' => round((float) ($item['unit_cost'] ?? 0), 2),
-                    'sales_price' => round((float) ($item['sales_price'] ?? 0), 2),
+                    'unit_price' => round((float) ($item['sales_price'] ?? 0), 2),
                     'line_total' => round((float) ($item['sales_total'] ?? 0), 2),
                 ];
             })
@@ -140,6 +140,7 @@ class WorkflowDocumentService
 
         $payload = $this->normalizeUtf8([
             'order' => $order,
+            'documentType' => $documentType,
             'documentOrder' => [
                 'order_number' => (string) $order->order_number,
                 'customer_name' => $this->resolveCustomerName($order),
@@ -156,6 +157,7 @@ class WorkflowDocumentService
             'company' => $this->companyProfile(),
             'generatedAt' => now(),
             'verificationUrl' => $this->verificationUrl($order),
+            'verificationQr' => $this->generateVerificationQr($this->verificationUrl($order)),
             'salesRepresentative' => (string) ($order->salesUser?->name ?? ''),
             'totals' => $this->resolveTotals($order, $items),
         ]);
@@ -209,6 +211,22 @@ class WorkflowDocumentService
             'grand_total' => $grandTotal,
             'currency' => (string) Setting::get('currency', 'USD'),
         ];
+    }
+
+    private function generateVerificationQr(string $url): ?string
+    {
+        try {
+            $qrPng = QrCode::format('png')
+                ->size(130)
+                ->margin(1)
+                ->generate($url);
+
+            return 'data:image/png;base64,' . base64_encode($qrPng);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return null;
+        }
     }
 
     private function renderPdf(string $view, array $payload, string $orientation = 'portrait'): string
