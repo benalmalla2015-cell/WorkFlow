@@ -5,8 +5,8 @@
     $logoSvg = file_exists($logoPath) ? file_get_contents($logoPath) : '';
     $logoMarkup = $logoSvg !== '' ? $logoSvg : '<div class="brand-fallback">DAYANCO</div>';
     $bankFee = 40.00;
-    $balanceDue = round((float) $totals['grand_total'] * 0.70, 2);
-    $invoiceTotalDue = round($balanceDue + $bankFee, 2);
+    $productsTotal = round((float) $totals['subtotal'], 2);
+    $invoiceTotalDue = round($productsTotal + $bankFee, 2);
     $paymentDetails = [
         'beneficiary_name' => $company['beneficiary_name'] ?: 'DAYANCO',
         'beneficiary_bank' => $company['beneficiary_bank'] ?: 'ZHEJIANG CHOUZHOU COMMERCIAL BANK',
@@ -82,21 +82,17 @@
                     </tr>
                 @endforelse
                 <tr class="soft-total">
-                    <td colspan="3" class="align-right">Sub-total Above {{ $totals['currency'] }}</td>
-                    <td class="amount">{{ number_format((float) $totals['subtotal'], 2) }}</td>
-                </tr>
-                <tr class="soft-total">
-                    <td colspan="3" class="align-right">70% Balance {{ $totals['currency'] }}</td>
-                    <td class="amount">{{ number_format($balanceDue, 2) }}</td>
+                    <td colspan="3" class="align-right">Products Total Amount:</td>
+                    <td class="amount">{{ number_format($productsTotal, 2) }}</td>
                 </tr>
                 <tr>
                     <td>{{ $generatedAt->format('M d') }}</td>
-                    <td>Bank Fee</td>
+                    <td>Local Bank Fee</td>
                     <td>Local Bank Charge of IMT</td>
                     <td class="amount">{{ number_format($bankFee, 2) }}</td>
                 </tr>
                 <tr class="grand-row">
-                    <td colspan="3" class="align-right">Total Amount due to This Invoice:</td>
+                    <td colspan="3" class="align-right">Final Total Amount:</td>
                     <td class="amount"><span class="amount-chip">{{ $totals['currency'] }}{{ number_format($invoiceTotalDue, 2) }}</span></td>
                 </tr>
             </tbody>
