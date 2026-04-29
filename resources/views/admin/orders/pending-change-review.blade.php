@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'مراجعة التعديلات المعلقة | WorkFlow')
+@section('title', __('مراجعة التعديلات المعلقة') . ' | WorkFlow')
 
 @php
     $current = $pendingChanges['current'] ?? [];
@@ -9,34 +9,34 @@
     $requester = $order->pendingAdjustmentLog?->requester ?: $order->pendingChangeRequester;
     $requestSubmittedAt = $order->pending_change_requested_at ?: $order->pendingAdjustmentLog?->created_at;
     $roleLabels = [
-        'admin' => 'الإدارة',
-        'sales' => 'المبيعات',
-        'factory' => 'المصنع',
+        'admin' => __('الإدارة'),
+        'sales' => __('المبيعات'),
+        'factory' => __('المصنع'),
     ];
     $statusLabels = [
-        'draft' => 'جديد',
-        'sent_to_factory' => 'تم الإرسال إلى المصنع',
-        'factory_pricing' => 'عاد لتعديل تشغيلي',
-        'manager_review' => 'قيد مراجعة المدير',
-        'pending_approval' => 'طلب تعديل بانتظار الاعتماد',
-        'approved' => 'معتمد',
-        'customer_approved' => 'موافقة العميل مسجلة',
-        'payment_confirmed' => 'تم تأكيد الدفع',
-        'completed' => 'مكتمل',
+        'draft' => __('جديد'),
+        'sent_to_factory' => __('تم الإرسال إلى المصنع'),
+        'factory_pricing' => __('عاد لتعديل تشغيلي'),
+        'manager_review' => __('قيد مراجعة المدير'),
+        'pending_approval' => __('طلب تعديل بانتظار الاعتماد'),
+        'approved' => __('معتمد'),
+        'customer_approved' => __('موافقة العميل مسجلة'),
+        'payment_confirmed' => __('تم تأكيد الدفع'),
+        'completed' => __('مكتمل'),
     ];
     $proposedAttachments = is_array($proposed['attachments'] ?? null) ? $proposed['attachments'] : [];
     $formatMoney = function ($value) use ($priceComparison) {
         return $value === null
-            ? 'بانتظار إعادة التسعير'
+            ? __('بانتظار إعادة التسعير')
             : ($priceComparison['currency'] ?? 'USD') . ' ' . number_format((float) $value, 2);
     };
     $deltaLabel = $priceComparison['delta'] === null
-        ? 'بانتظار إعادة التسعير'
+        ? __('بانتظار إعادة التسعير')
         : ((float) $priceComparison['delta'] === 0.0
-            ? 'لا يوجد تغير في السعر النهائي'
+            ? __('لا يوجد تغير في السعر النهائي')
             : ((float) $priceComparison['delta'] > 0
-                ? 'زيادة ' . ($priceComparison['currency'] ?? 'USD') . ' ' . number_format((float) $priceComparison['delta'], 2)
-                : 'انخفاض ' . ($priceComparison['currency'] ?? 'USD') . ' ' . number_format(abs((float) $priceComparison['delta']), 2)));
+                ? __('زيادة') . ' ' . ($priceComparison['currency'] ?? 'USD') . ' ' . number_format((float) $priceComparison['delta'], 2)
+                : __('انخفاض') . ' ' . ($priceComparison['currency'] ?? 'USD') . ' ' . number_format(abs((float) $priceComparison['delta']), 2)));
 @endphp
 
 @push('styles')
@@ -101,12 +101,12 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
         <div>
-            <h1 class="h3 mb-1">مراجعة تعديل معلّق للطلب {{ $order->order_number }}</h1>
-            <div class="text-muted">عرض إداري نظيف للفروقات الفعلية، مع مقارنة السعر النهائي فقط دون أي تكلفة مصنع أو بيانات خام.</div>
+            <h1 class="h3 mb-1">{{ __('مراجعة تعديل معلّق للطلب') }} {{ $order->order_number }}</h1>
+            <div class="text-muted">{{ __('عرض إداري نظيف للفروقات الفعلية، مع مقارنة السعر النهائي فقط دون أي تكلفة مصنع أو بيانات خام.') }}</div>
         </div>
         <div class="d-flex align-items-center gap-2">
             <span class="badge-status status-{{ $order->status }}">{{ $order->status_label }}</span>
-            <a href="{{ route('admin.dashboard') }}" class="btn btn-outline-secondary">رجوع</a>
+            <a href="{{ route('admin.dashboard') }}" class="btn btn-outline-secondary">{{ __('رجوع') }}</a>
         </div>
     </div>
 
@@ -114,7 +114,7 @@
         <div class="col-md-3">
             <div class="card review-metric-card h-100">
                 <div class="card-body">
-                    <div class="review-metric-label">مقدم الطلب</div>
+                    <div class="review-metric-label">{{ __('مقدم الطلب') }}</div>
                     <div class="review-metric-value">{{ $requester?->name ?: ($pendingRequester['name'] ?? '—') }}</div>
                     <div class="text-muted small mt-2">{{ $roleLabels[$requester?->role ?: ($pendingRequester['role'] ?? '')] ?? '—' }}</div>
                 </div>
@@ -123,7 +123,7 @@
         <div class="col-md-3">
             <div class="card review-metric-card h-100">
                 <div class="card-body">
-                    <div class="review-metric-label">وقت الطلب</div>
+                    <div class="review-metric-label">{{ __('وقت الطلب') }}</div>
                     <div class="review-metric-value">{{ $requestSubmittedAt?->format('Y-m-d H:i:s') ?: '—' }}</div>
                 </div>
             </div>
@@ -131,7 +131,7 @@
         <div class="col-md-3">
             <div class="card review-metric-card h-100">
                 <div class="card-body">
-                    <div class="review-metric-label">الحالة قبل الطلب</div>
+                    <div class="review-metric-label">{{ __('الحالة قبل الطلب') }}</div>
                     <div class="review-metric-value">{{ $statusLabels[$pendingChanges['previous_status'] ?? ''] ?? '—' }}</div>
                 </div>
             </div>
@@ -139,7 +139,7 @@
         <div class="col-md-3">
             <div class="card review-metric-card h-100">
                 <div class="card-body">
-                    <div class="review-metric-label">الحالة بعد الاعتماد</div>
+                    <div class="review-metric-label">{{ __('الحالة بعد الاعتماد') }}</div>
                     <div class="review-metric-value">{{ $statusLabels[$pendingChanges['target_status'] ?? ''] ?? '—' }}</div>
                 </div>
             </div>
@@ -150,10 +150,10 @@
         <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
                 <div>
-                    <h2 class="h5 section-title mb-1">الفروقات المعروضة للإدارة</h2>
-                    <div class="text-muted small">جميع السطور التالية معروضة بصيغة بشرية واضحة، بدون حقول داخلية أو JSON.</div>
+                    <h2 class="h5 section-title mb-1">{{ __('الفروقات المعروضة للإدارة') }}</h2>
+                    <div class="text-muted small">{{ __('جميع السطور التالية معروضة بصيغة بشرية واضحة، بدون حقول داخلية أو JSON.') }}</div>
                 </div>
-                <span class="review-pill blue">{{ count($comparisonRows) }} تغيير واضح</span>
+                <span class="review-pill blue">{{ count($comparisonRows) }} {{ __('تغيير واضح') }}</span>
             </div>
 
             @if ($comparisonRows !== [])
@@ -161,9 +161,9 @@
                     <table class="table review-table align-middle mb-0">
                         <thead>
                             <tr>
-                                <th style="width:24%;">الحقل</th>
-                                <th>القيمة الحالية</th>
-                                <th>القيمة المقترحة</th>
+                                <th style="width:24%;">{{ __('الحقل') }}</th>
+                                <th>{{ __('القيمة الحالية') }}</th>
+                                <th>{{ __('القيمة المقترحة') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -178,7 +178,7 @@
                     </table>
                 </div>
             @else
-                <div class="review-empty">لا توجد فروقات نصية مباشرة، وقد يكون التغيير متعلقًا بالعناصر أو بالمرفقات فقط.</div>
+                <div class="review-empty">{{ __('لا توجد فروقات نصية مباشرة، وقد يكون التغيير متعلقًا بالعناصر أو بالمرفقات فقط.') }}</div>
             @endif
         </div>
     </div>
@@ -187,7 +187,7 @@
         <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
                 <div>
-                    <h2 class="h5 section-title mb-1">مقارنة السعر النهائي</h2>
+                    <h2 class="h5 section-title mb-1">{{ __('مقارنة السعر النهائي') }}</h2>
                     <div class="text-muted small">{{ $priceComparison['note'] }}</div>
                 </div>
                 <span class="review-pill {{ $priceComparison['requires_repricing'] ? 'gold' : 'blue' }}">{{ $deltaLabel }}</span>
@@ -197,29 +197,29 @@
                 <table class="table review-table align-middle mb-0">
                     <thead>
                         <tr>
-                            <th style="width:24%;">المعيار</th>
-                            <th>الحالي</th>
-                            <th>المقترح</th>
+                            <th style="width:24%;">{{ __('المعيار') }}</th>
+                            <th>{{ __('الحالي') }}</th>
+                            <th>{{ __('المقترح') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td class="fw-semibold">إجمالي السعر النهائي</td>
+                            <td class="fw-semibold">{{ __('إجمالي السعر النهائي') }}</td>
                             <td>{{ $formatMoney($priceComparison['current_total']) }}</td>
                             <td>{{ $formatMoney($priceComparison['proposed_total']) }}</td>
                         </tr>
                         <tr>
-                            <td class="fw-semibold">سعر الوحدة النهائي</td>
+                            <td class="fw-semibold">{{ __('سعر الوحدة النهائي') }}</td>
                             <td>{{ $formatMoney($priceComparison['current_unit']) }}</td>
                             <td>{{ $formatMoney($priceComparison['proposed_unit']) }}</td>
                         </tr>
                         <tr>
-                            <td class="fw-semibold">الكمية</td>
+                            <td class="fw-semibold">{{ __('الكمية') }}</td>
                             <td>{{ number_format((int) $priceComparison['current_quantity']) }}</td>
                             <td>{{ number_format((int) $priceComparison['proposed_quantity']) }}</td>
                         </tr>
                         <tr>
-                            <td class="fw-semibold">مدة الإنتاج</td>
+                            <td class="fw-semibold">{{ __('مدة الإنتاج') }}</td>
                             <td>{{ $priceComparison['current_production_days'] }}</td>
                             <td>{{ $priceComparison['proposed_production_days'] }}</td>
                         </tr>
@@ -233,17 +233,17 @@
         <div class="col-lg-6">
             <div class="card form-card h-100">
                 <div class="card-body p-4">
-                    <h2 class="h5 section-title">العناصر الحالية</h2>
+                    <h2 class="h5 section-title">{{ __('العناصر الحالية') }}</h2>
                     @if (($priceComparison['current_items'] ?? []) !== [])
                         <div class="table-responsive">
                             <table class="table review-table align-middle mb-0">
                                 <thead>
                                     <tr>
-                                        <th>العنصر</th>
-                                        <th>الكمية</th>
-                                        <th>الوصف</th>
-                                        <th>سعر نهائي للوحدة</th>
-                                        <th>الإجمالي النهائي</th>
+                                        <th>{{ __('العنصر') }}</th>
+                                        <th>{{ __('الكمية') }}</th>
+                                        <th>{{ __('الوصف') }}</th>
+                                        <th>{{ __('سعر نهائي للوحدة') }}</th>
+                                        <th>{{ __('الإجمالي النهائي') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -260,7 +260,7 @@
                             </table>
                         </div>
                     @else
-                        <div class="review-empty">لا توجد عناصر حالية قابلة للعرض.</div>
+                        <div class="review-empty">{{ __('لا توجد عناصر حالية قابلة للعرض.') }}</div>
                     @endif
                 </div>
             </div>
@@ -269,17 +269,17 @@
         <div class="col-lg-6">
             <div class="card form-card h-100 border border-primary-subtle">
                 <div class="card-body p-4">
-                    <h2 class="h5 section-title text-primary">العناصر المقترحة</h2>
+                    <h2 class="h5 section-title text-primary">{{ __('العناصر المقترحة') }}</h2>
                     @if (($priceComparison['proposed_items'] ?? []) !== [])
                         <div class="table-responsive">
                             <table class="table review-table align-middle mb-0">
                                 <thead>
                                     <tr>
-                                        <th>العنصر</th>
-                                        <th>الكمية</th>
-                                        <th>الوصف</th>
-                                        <th>سعر نهائي للوحدة</th>
-                                        <th>الإجمالي النهائي</th>
+                                        <th>{{ __('العنصر') }}</th>
+                                        <th>{{ __('الكمية') }}</th>
+                                        <th>{{ __('الوصف') }}</th>
+                                        <th>{{ __('سعر نهائي للوحدة') }}</th>
+                                        <th>{{ __('الإجمالي النهائي') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -296,7 +296,7 @@
                             </table>
                         </div>
                     @else
-                        <div class="review-empty">لا توجد عناصر مقترحة قابلة للعرض.</div>
+                        <div class="review-empty">{{ __('لا توجد عناصر مقترحة قابلة للعرض.') }}</div>
                     @endif
                 </div>
             </div>
@@ -306,11 +306,11 @@
     @if ($proposedAttachments !== [])
         <div class="card form-card mb-4">
             <div class="card-body p-4">
-                <h2 class="h5 section-title">المرفقات الجديدة بانتظار التثبيت</h2>
+                <h2 class="h5 section-title">{{ __('المرفقات الجديدة بانتظار التثبيت') }}</h2>
                 <div class="list-group list-group-flush">
                     @foreach ($proposedAttachments as $attachment)
                         <div class="list-group-item d-flex justify-content-between align-items-center px-0">
-                            <span>{{ $attachment['original_name'] ?? 'attachment' }}</span>
+                            <span>{{ $attachment['original_name'] ?? __('attachment') }}</span>
                             <span class="text-muted small">{{ strtoupper(pathinfo($attachment['original_name'] ?? '', PATHINFO_EXTENSION)) }}</span>
                         </div>
                     @endforeach
@@ -325,10 +325,10 @@
                 @csrf
                 <div class="card-body p-4 d-flex flex-column justify-content-between">
                     <div>
-                        <h2 class="h5 section-title text-success">اعتماد التعديل</h2>
-                        <div class="text-muted">سيتم تثبيت التعديلات على البيانات الأصلية، وتسجيل العملية في سجل الرقابة، ثم إشعار الموظف عبر الجرس.</div>
+                        <h2 class="h5 section-title text-success">{{ __('اعتماد التعديل') }}</h2>
+                        <div class="text-muted">{{ __('سيتم تثبيت التعديلات على البيانات الأصلية، وتسجيل العملية في سجل الرقابة، ثم إشعار الموظف عبر الجرس.') }}</div>
                     </div>
-                    <button type="submit" class="btn btn-success btn-lg mt-3">اعتماد التعديل</button>
+                    <button type="submit" class="btn btn-success btn-lg mt-3">{{ __('اعتماد التعديل') }}</button>
                 </div>
             </form>
         </div>
@@ -338,11 +338,11 @@
                 @csrf
                 <div class="card-body p-4 d-flex flex-column justify-content-between">
                     <div>
-                        <h2 class="h5 section-title text-danger">رفض التعديل</h2>
-                        <label class="form-label">سبب الرفض</label>
-                        <textarea name="reason" rows="4" class="form-control" placeholder="أدخل سببًا اختياريًا يظهر للموظف في الإشعار..."></textarea>
+                        <h2 class="h5 section-title text-danger">{{ __('رفض التعديل') }}</h2>
+                        <label class="form-label">{{ __('سبب الرفض') }}</label>
+                        <textarea name="reason" rows="4" class="form-control" placeholder="{{ __('أدخل سببًا اختياريًا يظهر للموظف في الإشعار...') }}"></textarea>
                     </div>
-                    <button type="submit" class="btn btn-danger btn-lg mt-3">رفض التعديل</button>
+                    <button type="submit" class="btn btn-danger btn-lg mt-3">{{ __('رفض التعديل') }}</button>
                 </div>
             </form>
         </div>
@@ -353,11 +353,11 @@
             <form method="POST" action="{{ route('admin.orders.pending-changes.revision', $order) }}" class="card form-card">
                 @csrf
                 <div class="card-body p-4">
-                    <h2 class="h5 section-title text-warning">طلب استكمال أو تعديل إضافي</h2>
-                    <div class="text-muted mb-3">استخدم هذا الخيار عندما يكون طلب التعديل قريبًا من القبول لكنه يحتاج استكمالًا أو تصحيحًا إضافيًا قبل الاعتماد.</div>
-                    <label class="form-label">ملاحظات المدير</label>
-                    <textarea name="reason" rows="4" class="form-control" placeholder="اكتب ما الذي يجب استكماله أو تعديله قبل إعادة الإرسال..."></textarea>
-                    <button type="submit" class="btn btn-outline-warning mt-3">إعادة الطلب للاستكمال</button>
+                    <h2 class="h5 section-title text-warning">{{ __('طلب استكمال أو تعديل إضافي') }}</h2>
+                    <div class="text-muted mb-3">{{ __('استخدم هذا الخيار عندما يكون طلب التعديل قريبًا من القبول لكنه يحتاج استكمالًا أو تصحيحًا إضافيًا قبل الاعتماد.') }}</div>
+                    <label class="form-label">{{ __('ملاحظات المدير') }}</label>
+                    <textarea name="reason" rows="4" class="form-control" placeholder="{{ __('اكتب ما الذي يجب استكماله أو تعديله قبل إعادة الإرسال...') }}"></textarea>
+                    <button type="submit" class="btn btn-outline-warning mt-3">{{ __('إعادة الطلب للاستكمال') }}</button>
                 </div>
             </form>
         </div>

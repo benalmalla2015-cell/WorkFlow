@@ -1,8 +1,8 @@
 ﻿<!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
-    <title>عرض سعر {{ $order->order_number }}</title>
+    <title>{{ __('عرض سعر') }} {{ $order->order_number }}</title>
     <style>
         body {
             font-family: DejaVu Sans, sans-serif;
@@ -10,11 +10,11 @@
             font-size: 11px;
             margin: 0;
             padding: 18px 22px;
-            direction: rtl;
+            direction: {{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }};
         }
         .header { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
         .brand-block { width: 64%; vertical-align: top; }
-        .doc-block { width: 36%; vertical-align: top; text-align: left; }
+        .doc-block { width: 36%; vertical-align: top; text-align: start; }
         .brand { font-size: 28px; font-weight: 900; color: #0f172a; letter-spacing: 1px; }
         .brand-sub { font-size: 10px; color: #475569; margin-top: 3px; }
         .brand-ar { font-size: 12px; font-weight: 700; margin-top: 5px; }
@@ -30,7 +30,7 @@
         .items-table th { background: #0f172a; color: #fff; padding: 9px 7px; font-size: 10px; text-align: center; }
         .items-table td { border: 1px solid #dbe2ea; padding: 8px 7px; font-size: 10px; text-align: center; vertical-align: top; }
         .items-table tbody tr:nth-child(even) { background: #f8fafc; }
-        .summary-wrap { width: 42%; margin-right: auto; }
+        .summary-wrap { width: 42%; margin-inline-start: auto; }
         .summary-table td { border: 1px solid #dbe2ea; padding: 7px 10px; font-size: 10px; }
         .summary-table .grand td { background: #0f172a; color: #fff; font-weight: 800; }
         .notes { margin-top: 18px; border: 1px dashed #94a3b8; border-radius: 12px; padding: 10px 12px; font-size: 9px; line-height: 1.9; color: #475569; }
@@ -42,20 +42,20 @@
         <tr>
             <td class="brand-block">
                 <div class="brand">DAYANCO®</div>
-                <div class="brand-sub">Supply Chain Management</div>
+                <div class="brand-sub">{{ __('Supply Chain Management') }}</div>
                 <div class="company-meta">
                     {{ $company['address'] ?: 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA' }}<br>
-                    ATTN: {{ $company['attn'] ?: 'Mr. Abdulmalek' }} | {{ $company['phone'] ?: '+86 188188 45411' }} | {{ $company['email'] ?: 'team@dayancoofficial.com' }}
+                    {{ __('ATTN') }}: {{ $company['attn'] ?: 'Mr. Abdulmalek' }} | {{ $company['phone'] ?: '+86 188188 45411' }} | {{ $company['email'] ?: 'team@dayancoofficial.com' }}
                 </div>
             </td>
             <td class="doc-block">
                 <div class="doc-card">
-                    <div class="doc-name">QUOTATION</div>
+                    <div class="doc-name">{{ __('QUOTATION') }}</div>
                     <div class="doc-meta">
-                        <strong>رقم العرض:</strong> {{ $documentOrder['order_number'] }}<br>
-                        <strong>التاريخ:</strong> {{ $generatedAt->format('Y-m-d') }}<br>
-                        <strong>صالح حتى:</strong> {{ $generatedAt->copy()->addDays(21)->format('Y-m-d') }}<br>
-                        <strong>العملة:</strong> {{ $totals['currency'] }}
+                        <strong>{{ __('رقم العرض') }}:</strong> {{ $documentOrder['order_number'] }}<br>
+                        <strong>{{ __('التاريخ') }}:</strong> {{ $generatedAt->format('Y-m-d') }}<br>
+                        <strong>{{ __('صالح حتى') }}:</strong> {{ $generatedAt->copy()->addDays(21)->format('Y-m-d') }}<br>
+                        <strong>{{ __('العملة') }}:</strong> {{ $totals['currency'] }}
                     </div>
                 </div>
             </td>
@@ -63,19 +63,19 @@
     </table>
 
     <div class="section">
-        <div class="section-title">بيانات العميل</div>
+        <div class="section-title">{{ __('بيانات العميل') }}</div>
         <table class="customer-table">
             <tr>
-                <td class="label">العميل</td>
+                <td class="label">{{ __('العميل') }}</td>
                 <td>{{ $documentOrder['customer_name'] }}</td>
             </tr>
             <tr>
-                <td class="label">مرجع الطلب</td>
+                <td class="label">{{ __('مرجع الطلب') }}</td>
                 <td>{{ $documentOrder['order_number'] }}</td>
             </tr>
             <tr>
-                <td class="label">مدة الإنتاج</td>
-                <td>{{ $documentOrder['production_days'] }} يوم</td>
+                <td class="label">{{ __('مدة الإنتاج') }}</td>
+                <td>{{ $documentOrder['production_days'] }} {{ __('يوم') }}</td>
             </tr>
         </table>
     </div>
@@ -84,11 +84,11 @@
         <thead>
             <tr>
                 <th style="width: 6%;">#</th>
-                <th style="width: 28%;">الصنف / Item</th>
-                <th>الوصف / Description</th>
-                <th style="width: 12%;">الكمية / Qty</th>
-                <th style="width: 16%;">سعر البيع / Sales Price</th>
-                <th style="width: 18%;">الإجمالي / Total</th>
+                <th style="width: 28%;">{{ __('الصنف / Item') }}</th>
+                <th>{{ __('الوصف / Description') }}</th>
+                <th style="width: 12%;">{{ __('الكمية / Qty') }}</th>
+                <th style="width: 16%;">{{ __('سعر البيع / Sales Price') }}</th>
+                <th style="width: 18%;">{{ __('الإجمالي / Total') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -108,27 +108,27 @@
     <div class="summary-wrap">
         <table class="summary-table">
             <tr>
-                <td>الإجمالي قبل الضريبة</td>
+                <td>{{ __('الإجمالي قبل الضريبة') }}</td>
                 <td style="text-align: left;">{{ $totals['currency'] }} {{ number_format((float) $totals['subtotal'], 2) }}</td>
             </tr>
             <tr>
-                <td>الضريبة</td>
+                <td>{{ __('الضريبة') }}</td>
                 <td style="text-align: left;">{{ number_format((float) $totals['tax_rate'], 2) }}% ({{ $totals['currency'] }} {{ number_format((float) $totals['tax_amount'], 2) }})</td>
             </tr>
             <tr class="grand">
-                <td>الإجمالي النهائي</td>
+                <td>{{ __('الإجمالي النهائي') }}</td>
                 <td style="text-align: left;">{{ $totals['currency'] }} {{ number_format((float) $totals['grand_total'], 2) }}</td>
             </tr>
         </table>
     </div>
 
     <div class="notes">
-        <strong>الشروط والملاحظات / Terms & Notes</strong><br>
-        - الأسعار المذكورة أعلاه مبنية على البيانات الحالية للطلب والمواصفات المعتمدة.<br>
-        - مدة صلاحية عرض السعر 21 يومًا من تاريخ الإصدار.<br>
-        - لا يتم احتساب أي رسوم إضافية إلا إذا نص النظام أو الاتفاق التجاري على ذلك.<br>
-        - This quotation is valid for 21 days from the issue date.<br>
-        - Taxes are applied only if configured in the company settings.
+        <strong>{{ __('الشروط والملاحظات / Terms & Notes') }}</strong><br>
+        - {{ __('الأسعار المذكورة أعلاه مبنية على البيانات الحالية للطلب والمواصفات المعتمدة.') }}<br>
+        - {{ __('مدة صلاحية عرض السعر 21 يومًا من تاريخ الإصدار.') }}<br>
+        - {{ __('لا يتم احتساب أي رسوم إضافية إلا إذا نص النظام أو الاتفاق التجاري على ذلك.') }}<br>
+        - {{ __('This quotation is valid for 21 days from the issue date.') }}<br>
+        - {{ __('Taxes are applied only if configured in the company settings.') }}
     </div>
 
     <div class="footer">

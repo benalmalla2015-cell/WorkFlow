@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
 <meta charset="utf-8">
-<title>Invoice {{ $invoice_number }}</title>
+<title>{{ __('Invoice') }} {{ $invoice_number }}</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: Arial, sans-serif; font-size: 9pt; color:#000; padding:15mm 12mm; }
@@ -67,7 +67,7 @@ table.bank .bank-label { background:#d5e8d4; font-weight:bold; width:38%; }
     <td valign="top" width="60%"></td>
     <td valign="top" width="40%" style="text-align:right;">
       <div class="brand">DAYANCO<sup>®</sup></div>
-      <div style="font-size:8pt;color:#555;">| Supply Chain Management |</div>
+      <div style="font-size:8pt;color:#555;">| {{ __('Supply Chain Management') }} |</div>
     </td>
   </tr></table>
 
@@ -75,7 +75,7 @@ table.bank .bank-label { background:#d5e8d4; font-weight:bold; width:38%; }
 
   {{-- TO line --}}
   <div class="to-line">
-    <span>TO Mr. {{ optional($customer)->full_name ?? '?' }} &ndash; Purchasing Manager</span>
+    <span>{{ __('TO') }} {{ __('Mr.') }} {{ optional($customer)->full_name ?? '?' }} &ndash; {{ __('Purchasing Manager') }}</span>
   </div>
   <hr class="thin">
 
@@ -84,28 +84,28 @@ table.bank .bank-label { background:#d5e8d4; font-weight:bold; width:38%; }
     <tr>
       <td></td>
       <td style="text-align:right;">
-        <span class="label">Invoice Number:</span> {{ $invoice_number }}<br>
-        <span class="label">Invoice Date:</span> {{ $invoice_date }}<br>
-        <span class="label">Page:</span> 1/page
+        <span class="label">{{ __('Invoice Number:') }}</span> {{ $invoice_number }}<br>
+        <span class="label">{{ __('Invoice Date:') }}</span> {{ $invoice_date }}<br>
+        <span class="label">{{ __('Page:') }}</span> 1/{{ __('page') }}
       </td>
     </tr>
   </table>
 
-  <div class="inv-title">INVOICE</div>
+  <div class="inv-title">{{ __('INVOICE') }}</div>
   <hr class="thick">
 
   <div class="project-line">
-    <strong>Project Name / ITEM NAME:</strong> {{ $order->product_name }}
+    <strong>{{ __('Project Name / ITEM NAME:') }}</strong> {{ $order->product_name }}
   </div>
 
   {{-- Items Table --}}
   <table class="items">
     <thead>
       <tr>
-        <th style="width:12%">Date</th>
-        <th style="width:18%">Item</th>
-        <th>Description</th>
-        <th style="width:18%;text-align:right;">Amount (USD)</th>
+        <th style="width:12%">{{ __('Date') }}</th>
+        <th style="width:18%">{{ __('Item') }}</th>
+        <th>{{ __('Description') }}</th>
+        <th style="width:18%;text-align:right;">{{ __('Amount (USD)') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -114,75 +114,75 @@ table.bank .bank-label { background:#d5e8d4; font-weight:bold; width:38%; }
         <td>{{ now()->format('M j\s\t') }}</td>
         <td>{{ $item['name'] }}</td>
         <td>
-          100% for {{ $item['quantity'] }} pcs<br>
-          – Refer to quotation number {{ $order->order_number }}<br>
-          – Specifications: {{ $item['description'] ?: 'As approved quotation' }}<br>
-          – Production Lead Time: around {{ $item['production_days'] }} days
+          {{ __('100% for') }} {{ $item['quantity'] }} {{ __('pcs') }}<br>
+          – {{ __('Refer to quotation number') }} {{ $order->order_number }}<br>
+          – {{ __('Specifications:') }} {{ $item['description'] ?: __('As approved quotation') }}<br>
+          – {{ __('Production Lead Time: around') }} {{ $item['production_days'] }} {{ __('days') }}
         </td>
         <td class="amount">{{ number_format($item['total'], 2) }}</td>
       </tr>
       @endforeach
 
       <tr class="total-row">
-        <td colspan="3" style="text-align:right;">Sub-total Above USD</td>
+        <td colspan="3" style="text-align:right;">{{ __('Sub-total Above USD') }}</td>
         <td class="amount">{{ number_format($subtotal, 2) }}</td>
       </tr>
       <tr class="total-row">
-        <td colspan="3" style="text-align:right;">70% Balance USD</td>
+        <td colspan="3" style="text-align:right;">{{ __('70% Balance USD') }}</td>
         <td class="amount">{{ number_format($subtotal * 0.7, 2) }}</td>
       </tr>
       <tr>
         <td>{{ now()->format('M j\s\t') }}</td>
-        <td>Bank Fee</td>
-        <td>Local Bank Charge of IMT</td>
+        <td>{{ __('Bank Fee') }}</td>
+        <td>{{ __('Local Bank Charge of IMT') }}</td>
         <td class="amount">40.00</td>
       </tr>
       <tr class="grand-total">
-        <td colspan="3" style="text-align:right;font-size:10pt;">Total Amount due to This Invoice:</td>
+        <td colspan="3" style="text-align:right;font-size:10pt;">{{ __('Total Amount due to This Invoice:') }}</td>
         <td class="amount" style="font-size:10pt;">USD&nbsp;{{ number_format($subtotal, 2) }}</td>
       </tr>
     </tbody>
   </table>
 
   {{-- Payment Section --}}
-  <div class="payment-title">Payment Method &lpar; For USD remittance &rpar;</div>
+  <div class="payment-title">{{ __('Payment Method ( For USD remittance )') }}</div>
   <table class="bank">
     <tr>
-      <td class="bank-label">Beneficiary Name</td>
+      <td class="bank-label">{{ __('Beneficiary Name') }}</td>
       <td>{{ $bank_details['beneficiary_name'] }}</td>
     </tr>
     <tr>
-      <td class="bank-label">Beneficiary Bank</td>
+      <td class="bank-label">{{ __('Beneficiary Bank') }}</td>
       <td>{{ $bank_details['beneficiary_bank'] }}</td>
     </tr>
     <tr>
-      <td class="bank-label">Beneficiary Account Numbers</td>
+      <td class="bank-label">{{ __('Beneficiary Account Numbers') }}</td>
       <td>{{ $bank_details['account_number'] }}</td>
     </tr>
     <tr>
-      <td class="bank-label">Beneficiary Address</td>
+      <td class="bank-label">{{ __('Beneficiary Address') }}</td>
       <td>{{ $bank_details['beneficiary_address'] }}</td>
     </tr>
     <tr>
-      <td class="bank-label">Bank Address</td>
+      <td class="bank-label">{{ __('Bank Address') }}</td>
       <td>{{ $bank_details['bank_address'] }}</td>
     </tr>
     <tr>
-      <td class="bank-label">SWIFT</td>
+      <td class="bank-label">{{ __('SWIFT') }}</td>
       <td>{{ $bank_details['swift_code'] }}</td>
     </tr>
     <tr>
-      <td class="bank-label">COUNTRY</td>
+      <td class="bank-label">{{ __('COUNTRY') }}</td>
       <td>{{ $bank_details['country'] }}</td>
     </tr>
     <tr>
-      <td class="bank-label">PURPOSE OF PAYMENTS</td>
+      <td class="bank-label">{{ __('PURPOSE OF PAYMENTS') }}</td>
       <td>{{ $bank_details['purpose'] }}</td>
     </tr>
   </table>
 
   <div class="remark">
-    <strong>REMARK:</strong> PLEASE USE THE FULL BENEFICIARY NAME ABOVE WHEN REMITTING, THANK YOU.
+    <strong>{{ __('REMARK:') }}</strong> {{ __('PLEASE USE THE FULL BENEFICIARY NAME ABOVE WHEN REMITTING, THANK YOU.') }}
   </div>
 
   {{-- Footer: Sales person + QR --}}
@@ -190,14 +190,14 @@ table.bank .bank-label { background:#d5e8d4; font-weight:bold; width:38%; }
     <tr>
       <td valign="bottom">
         <div class="sales-footer">
-          <strong>Sales Representative:</strong> {{ optional($sales_user)->name }}<br>
-          <small>Generated: {{ now()->format('Y-m-d H:i') }}</small>
+          <strong>{{ __('Sales Representative:') }}</strong> {{ optional($sales_user)->name }}<br>
+          <small>{{ __('Generated:') }} {{ now()->format('Y-m-d H:i') }}</small>
         </div>
       </td>
       <td width="100" valign="top" style="text-align:center;">
         @if(!empty($qr_code_base64))
           <img src="{{ $qr_code_base64 }}" style="width:80px;height:80px;"><br>
-          <small style="font-size:7pt;">Scan to verify</small>
+          <small style="font-size:7pt;">{{ __('Scan to verify') }}</small>
         @endif
       </td>
     </tr>

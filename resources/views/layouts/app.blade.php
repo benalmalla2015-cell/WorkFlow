@@ -1,19 +1,30 @@
+@php
+    $locale = app()->getLocale();
+    $dir = $locale === 'ar' ? 'rtl' : 'ltr';
+@endphp
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="{{ $locale }}" dir="{{ $dir }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @php
         $pageTitle = trim($__env->yieldContent('title'));
+        $systemTitle = __('نظام إدارة سير العمل');
         $pageTitle = $pageTitle !== ''
-            ? str_replace(' | WorkFlow', '', $pageTitle) . ' | نظام إدارة سير العمل | DAYANCO'
-            : 'نظام إدارة سير العمل | DAYANCO';
+            ? str_replace(' | WorkFlow', '', $pageTitle) . ' | ' . $systemTitle . ' | DAYANCO'
+            : $systemTitle . ' | DAYANCO';
     @endphp
     <title>{{ $pageTitle }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    @if ($dir === 'rtl')
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    @else
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    @endif
     <style>
-        body { background: #f5f7fb; color: #1f2937; text-align: right; }
+        body { background: #f5f7fb; color: #1f2937; text-align: start; }
+        html[dir="rtl"] body { text-align: right; }
+        html[dir="ltr"] body { text-align: left; }
         .portal-shell { min-height: 100vh; display: flex; }
         .portal-sidebar { width: 280px; background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); color: #fff; padding: 24px 18px; position: sticky; top: 0; height: 100vh; }
         .portal-sidebar a { color: rgba(255,255,255,.82); text-decoration: none; display: block; padding: 12px 14px; border-radius: 12px; margin-bottom: 8px; font-weight: 500; }
@@ -49,6 +60,10 @@
         .notification-item.unread { background: #eff6ff; }
         .notification-item:last-child { border-bottom: 0; }
         .toast-stack { position: fixed; top: 18px; left: 18px; z-index: 1085; display: flex; flex-direction: column; gap: 10px; }
+        html[dir="rtl"] .toast-stack { left: auto; right: 18px; }
+        html[dir="ltr"] .toast-stack { left: 18px; right: auto; }
+        html[dir="ltr"] .notification-dot { left: auto; right: 9px; }
+        html[dir="rtl"] .notification-dot { left: 9px; right: auto; }
         @media (max-width: 991.98px) {
             .portal-shell { display: block; }
             .portal-sidebar { width: 100%; height: auto; position: relative; }
@@ -64,6 +79,7 @@
         $links = [];
         $recentNotifications = $user?->notifications()->latest()->limit(5)->get() ?? collect();
         $unreadNotificationsCount = $user?->unreadNotifications()->count() ?? 0;
+        $availableLocales = (array) config('app.available_locales', []);
         $firebaseConfig = config('firebase.web');
         $firebaseVapidKey = config('firebase.vapid_public_key');
         $firebaseEnabled = filled($firebaseVapidKey)
@@ -74,19 +90,19 @@
 
         if ($user?->isAdmin()) {
             $links = [
-                ['label' => 'لوحة الاعتماد', 'route' => 'admin.dashboard'],
-                ['label' => 'إدارة المستخدمين', 'route' => 'admin.users.index'],
-                ['label' => 'الإعدادات', 'route' => 'admin.settings.index'],
-                ['label' => 'السجلات', 'route' => 'admin.audit-logs.index'],
+                ['label' => __('لوحة الاعتماد'), 'route' => 'admin.dashboard'],
+                ['label' => __('إدارة المستخدمين'), 'route' => 'admin.users.index'],
+                ['label' => __('الإعدادات'), 'route' => 'admin.settings.index'],
+                ['label' => __('السجلات'), 'route' => 'admin.audit-logs.index'],
             ];
         } elseif ($user?->isFactory()) {
             $links = [
-                ['label' => 'طلبات المصنع', 'route' => 'factory.orders.index'],
+                ['label' => __('طلبات المصنع'), 'route' => 'factory.orders.index'],
             ];
         } elseif ($user) {
             $links = [
-                ['label' => 'طلبات المبيعات', 'route' => 'sales.orders.index'],
-                ['label' => 'طلب جديد', 'route' => 'sales.orders.create'],
+                ['label' => __('طلبات المبيعات'), 'route' => 'sales.orders.index'],
+                ['label' => __('طلب جديد'), 'route' => 'sales.orders.create'],
             ];
         }
     @endphp
@@ -94,7 +110,7 @@
     <div class="portal-shell">
         <aside class="portal-sidebar">
             <div class="portal-brand">DAYANCO</div>
-            <div class="portal-tagline">نظام إدارة سير العمل المؤسسي</div>
+            <div class="portal-tagline">{{ __('نظام إدارة سير العمل المؤسسي') }}</div>
 
             @foreach ($links as $link)
                 <a href="{{ route($link['route']) }}" class="{{ request()->routeIs(str_replace('.index', '.*', $link['route'])) || request()->routeIs($link['route']) ? 'active' : '' }}">
@@ -124,13 +140,13 @@
                         <div class="dropdown-menu dropdown-menu-end notification-menu">
                             <div class="dropdown-header">
                                 <div>
-                                    <div class="fw-semibold">الإشعارات</div>
-                                    <div class="small text-muted"><span id="notification-unread-count">{{ $unreadNotificationsCount }}</span> غير مقروء</div>
+                                    <div class="fw-semibold">{{ __('الإشعارات') }}</div>
+                                    <div class="small text-muted"><span id="notification-unread-count">{{ $unreadNotificationsCount }}</span> {{ __('غير مقروء') }}</div>
                                 </div>
                                 @if ($unreadNotificationsCount > 0)
                                     <form method="POST" action="{{ route('notifications.read-all') }}">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-link text-decoration-none">تعليم الكل كمقروء</button>
+                                        <button type="submit" class="btn btn-sm btn-link text-decoration-none">{{ __('تعليم الكل كمقروء') }}</button>
                                     </form>
                                 @endif
                             </div>
@@ -142,19 +158,19 @@
                                     <div class="notification-item {{ $notification->read_at ? '' : 'unread' }}">
                                         <div class="d-flex justify-content-between align-items-start gap-3">
                                             <div>
-                                                <div class="fw-semibold">{{ $data['title'] ?? 'تنبيه جديد' }}</div>
+                                                <div class="fw-semibold">{{ $data['title'] ?? __('تنبيه جديد') }}</div>
                                                 <div class="small text-muted">{{ $data['message'] ?? '' }}</div>
                                                 @if (!empty($data['reason']))
-                                                    <div class="small text-danger mt-1">سبب القرار: {{ $data['reason'] }}</div>
+                                                    <div class="small text-danger mt-1">{{ __('سبب القرار') }}: {{ $data['reason'] }}</div>
                                                 @endif
                                                 <div class="small text-muted mt-2">{{ optional($notification->created_at)->diffForHumans() }}</div>
                                             </div>
                                             <div class="d-flex flex-column gap-2">
-                                                <a href="{{ route('notifications.open', $notification->id) }}" class="btn btn-sm btn-outline-primary">فتح</a>
+                                                <a href="{{ route('notifications.open', $notification->id) }}" class="btn btn-sm btn-outline-primary">{{ __('فتح') }}</a>
                                                 @if (!$notification->read_at)
                                                     <form method="POST" action="{{ route('notifications.read', $notification->id) }}">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-outline-secondary">مقروء</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary">{{ __('مقروء') }}</button>
                                                     </form>
                                                 @endif
                                             </div>
@@ -162,17 +178,27 @@
                                     </div>
                                 @empty
                                     <div class="notification-item">
-                                        <div class="text-muted small">لا توجد إشعارات حالياً.</div>
+                                        <div class="text-muted small">{{ __('لا توجد إشعارات حالياً.') }}</div>
                                     </div>
                                 @endforelse
                             </div>
                         </div>
                     </div>
-                    <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary btn-sm">الرئيسية</a>
+                    <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary btn-sm">{{ __('الرئيسية') }}</a>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" class="btn btn-dark btn-sm">تسجيل الخروج</button>
+                        <button type="submit" class="btn btn-dark btn-sm">{{ __('تسجيل الخروج') }}</button>
                     </form>
+                    @if (!empty($availableLocales))
+                        <form method="POST" action="{{ route('locale.switch') }}" class="d-inline-flex">
+                            @csrf
+                            <select name="locale" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="{{ __('Language') }}">
+                                @foreach ($availableLocales as $code => $label)
+                                    <option value="{{ $code }}" @selected($code === $locale)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </form>
+                    @endif
                 </div>
             </header>
 
@@ -187,7 +213,7 @@
 
                 @if ($errors->any())
                     <div class="alert alert-danger border-0 shadow-sm">
-                        <div class="fw-semibold mb-2">تعذر إتمام العملية:</div>
+                        <div class="fw-semibold mb-2">{{ __('تعذر إتمام العملية') }}:</div>
                         <ul class="mb-0 ps-3">
                             @foreach ($errors->all() as $error)
                                 <li>{{ $error }}</li>
@@ -199,7 +225,7 @@
                 @yield('content')
             </section>
 
-            <footer class="portal-footer">نظام إدارة سير العمل | DAYANCO</footer>
+            <footer class="portal-footer">{{ __('نظام إدارة سير العمل') }} | DAYANCO</footer>
         </main>
     </div>
 
@@ -219,6 +245,13 @@
                 const unreadCounter = document.getElementById('notification-unread-count');
                 const toastStack = document.getElementById('notification-toast-stack');
                 const notificationBellUrl = '/bell.mp3';
+                const notificationLabels = {
+                    newAlert: @json(__('تنبيه جديد')),
+                    decisionReason: @json(__('سبب القرار')),
+                    markRead: @json(__('مقروء')),
+                    open: @json(__('فتح')),
+                    noNotifications: @json(__('لا توجد إشعارات حالياً.')),
+                };
                 let latestNotificationId = null;
                 let lastNotificationFingerprint = null;
                 let lastNotificationFingerprintAt = 0;
@@ -233,7 +266,7 @@
                 const normalizeIncomingNotification = (payload = {}) => {
                     const data = payload.data || payload;
                     const notification = payload.notification || {};
-                    const title = notification.title || data.title || 'تنبيه جديد';
+                    const title = notification.title || data.title || notificationLabels.newAlert;
                     const message = notification.body || data.message || data.body || '';
                     const type = data.type || payload.type || '';
                     const soundEvent = data.sound_event || payload.sound_event || '';
@@ -324,7 +357,7 @@
                     wrapper.setAttribute('role', 'alert');
                     wrapper.innerHTML = `
                         <div class="toast-header">
-                            <strong class="me-auto">${escapeHtml(title || 'تنبيه جديد')}</strong>
+                            <strong class="me-auto">${escapeHtml(title || notificationLabels.newAlert)}</strong>
                             <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Close"></button>
                         </div>
                         <div class="toast-body">${escapeHtml(message || '')}</div>
@@ -369,19 +402,19 @@
                     }
 
                     if (!notifications.length) {
-                        notificationFeed.innerHTML = '<div class="notification-item"><div class="text-muted small">لا توجد إشعارات حالياً.</div></div>';
+                        notificationFeed.innerHTML = `<div class="notification-item"><div class="text-muted small">${notificationLabels.noNotifications}</div></div>`;
                         return;
                     }
 
                     notificationFeed.innerHTML = notifications.map((notification) => {
                         const reasonHtml = notification.reason
-                            ? `<div class="small text-danger mt-1">سبب القرار: ${escapeHtml(notification.reason)}</div>`
+                            ? `<div class="small text-danger mt-1">${notificationLabels.decisionReason}: ${escapeHtml(notification.reason)}</div>`
                             : '';
                         const markReadHtml = notification.is_read
                             ? ''
                             : `<form method="POST" action="/notifications/${notification.id}/read">
                                     <input type="hidden" name="_token" value="${escapeHtml(csrfToken || '')}">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary">مقروء</button>
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">${notificationLabels.markRead}</button>
                                </form>`;
 
                         return `
@@ -394,7 +427,7 @@
                                         <div class="small text-muted mt-2">${escapeHtml(notification.created_at_human || '')}</div>
                                     </div>
                                     <div class="d-flex flex-column gap-2">
-                                        <a href="${escapeHtml(notification.url)}" class="btn btn-sm btn-outline-primary">فتح</a>
+                                        <a href="${escapeHtml(notification.url)}" class="btn btn-sm btn-outline-primary">${notificationLabels.open}</a>
                                         ${markReadHtml}
                                     </div>
                                 </div>

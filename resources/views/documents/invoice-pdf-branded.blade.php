@@ -19,10 +19,10 @@
     ];
 @endphp
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
-    <title>Invoice {{ $documentOrder['order_number'] }}</title>
+    <title>{{ __('Invoice') }} {{ $documentOrder['order_number'] }}</title>
     <style>{!! $pdfCss !!}</style>
 </head>
 <body>
@@ -36,31 +36,31 @@
             </tr>
         </table>
 
-        <div class="recipient-row"><span class="label">TO</span> Mr. {{ $documentOrder['customer_name'] }} - Purchasing Manager</div>
+        <div class="recipient-row"><span class="label">{{ __('TO') }}</span> {{ __('Mr.') }} {{ $documentOrder['customer_name'] }} - {{ __('Purchasing Manager') }}</div>
 
         <table class="document-meta-table">
             <tr>
                 <td class="document-meta-left"></td>
                 <td class="document-meta-right">
-                    <span class="meta-label">Invoice Number:</span> {{ $documentOrder['order_number'] }}<br>
-                    <span class="meta-label">Invoice Date:</span> {{ $documentOrder['issue_date_long'] }}<br>
-                    <span class="meta-label">Page:</span> 1/page
+                    <span class="meta-label">{{ __('Invoice Number:') }}</span> {{ $documentOrder['order_number'] }}<br>
+                    <span class="meta-label">{{ __('Invoice Date:') }}</span> {{ $documentOrder['issue_date_long'] }}<br>
+                    <span class="meta-label">{{ __('Page:') }}</span> 1/{{ __('page') }}
                 </td>
             </tr>
         </table>
 
-        <div class="document-title">INVOICE</div>
+        <div class="document-title">{{ __('INVOICE') }}</div>
         <hr class="rule-strong">
 
-        <div class="project-line"><strong>Project Name:</strong> {{ $documentOrder['product_name'] }}</div>
+        <div class="project-line"><strong>{{ __('Project Name:') }}</strong> {{ $documentOrder['product_name'] }}</div>
 
         <table class="invoice-items">
             <thead>
                 <tr>
-                    <th style="width:14%;">Date</th>
-                    <th style="width:20%;">Item</th>
-                    <th>Description</th>
-                    <th style="width:18%;">Amount ({{ $totals['currency'] }})</th>
+                    <th style="width:14%;">{{ __('Date') }}</th>
+                    <th style="width:20%;">{{ __('Item') }}</th>
+                    <th>{{ __('Description') }}</th>
+                    <th style="width:18%;">{{ __('Amount') }} ({{ $totals['currency'] }})</th>
                 </tr>
             </thead>
             <tbody>
@@ -69,85 +69,85 @@
                         <td>{{ $generatedAt->format('M d') }}</td>
                         <td>{{ $item['item_name'] }}</td>
                         <td>
-                            100% for {{ number_format((float) $item['quantity']) }} pcs<br>
-                            - Refer to quotation number {{ $documentOrder['order_number'] }}<br>
-                            - Specifications: {{ $item['description'] ?: 'As approved quotation' }}<br>
-                            - Production Lead Time: around {{ $documentOrder['production_days'] }} days
+                            {{ __('100% for') }} {{ number_format((float) $item['quantity']) }} {{ __('pcs') }}<br>
+                            - {{ __('Refer to quotation number') }} {{ $documentOrder['order_number'] }}<br>
+                            - {{ __('Specifications:') }} {{ $item['description'] ?: __('As approved quotation') }}<br>
+                            - {{ __('Production Lead Time: around') }} {{ $documentOrder['production_days'] }} {{ __('days') }}
                         </td>
                         <td class="amount">{{ number_format((float) $item['line_total'], 2) }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" class="placeholder">No invoice items available.</td>
+                        <td colspan="4" class="placeholder">{{ __('No invoice items available.') }}</td>
                     </tr>
                 @endforelse
                 <tr class="soft-total">
-                    <td colspan="3" class="align-right">Products Total Amount:</td>
+                    <td colspan="3" class="align-right">{{ __('Products Total Amount:') }}</td>
                     <td class="amount">{{ number_format($productsTotal, 2) }}</td>
                 </tr>
                 <tr>
                     <td>{{ $generatedAt->format('M d') }}</td>
-                    <td>Local Bank Fee</td>
-                    <td>Local Bank Charge of IMT</td>
+                    <td>{{ __('Local Bank Fee') }}</td>
+                    <td>{{ __('Local Bank Charge of IMT') }}</td>
                     <td class="amount">{{ number_format($bankFee, 2) }}</td>
                 </tr>
                 <tr class="grand-row">
-                    <td colspan="3" class="align-right">Final Total Amount:</td>
+                    <td colspan="3" class="align-right">{{ __('Final Total Amount:') }}</td>
                     <td class="amount"><span class="amount-chip">{{ $totals['currency'] }}{{ number_format($invoiceTotalDue, 2) }}</span></td>
                 </tr>
             </tbody>
         </table>
 
-        <div class="payment-section-title">Payment Method ( For USD remittance )</div>
+        <div class="payment-section-title">{{ __('Payment Method ( For USD remittance )') }}</div>
 
         <table class="payment-table">
             <tr>
-                <th>Beneficiary Name</th>
+                <th>{{ __('Beneficiary Name') }}</th>
                 <td>{{ $paymentDetails['beneficiary_name'] }}</td>
             </tr>
             <tr>
-                <th>Beneficiary Bank</th>
+                <th>{{ __('Beneficiary Bank') }}</th>
                 <td>{{ $paymentDetails['beneficiary_bank'] }}</td>
             </tr>
             <tr>
-                <th>Beneficiary Account Numbers</th>
+                <th>{{ __('Beneficiary Account Numbers') }}</th>
                 <td>{{ $paymentDetails['account_number'] }}</td>
             </tr>
             <tr>
-                <th>Beneficiary Address</th>
+                <th>{{ __('Beneficiary Address') }}</th>
                 <td>{{ $paymentDetails['beneficiary_address'] }}</td>
             </tr>
             <tr>
-                <th>Bank Address</th>
+                <th>{{ __('Bank Address') }}</th>
                 <td>{{ $paymentDetails['bank_address'] }}</td>
             </tr>
             <tr>
-                <th>SWIFT</th>
+                <th>{{ __('SWIFT') }}</th>
                 <td>{{ $paymentDetails['swift_code'] }}</td>
             </tr>
             <tr>
-                <th>COUNTRY</th>
+                <th>{{ __('COUNTRY') }}</th>
                 <td>{{ $paymentDetails['country'] }}</td>
             </tr>
             <tr>
-                <th>PURPOSE OF PAYMENTS</th>
+                <th>{{ __('PURPOSE OF PAYMENTS') }}</th>
                 <td class="bank-purpose">{{ $paymentDetails['payment_purpose'] }}</td>
             </tr>
         </table>
 
-        <div class="remark-box">REMARK: PLEASE USE THE FULL BENEFICIARY NAME ABOVE WHEN REMITTING. THANK YOU.</div>
+        <div class="remark-box">{{ __('REMARK: PLEASE USE THE FULL BENEFICIARY NAME ABOVE WHEN REMITTING. THANK YOU.') }}</div>
 
         <table class="footer-table">
             <tr>
                 <td>
-                    <div class="footer-note"><strong>Sales Representative:</strong> {{ $salesRepresentative ?: 'Sales Team' }}</div>
-                    <div class="footer-note"><strong>Generated:</strong> {{ $generatedAt->format('Y-m-d H:i') }}</div>
+                    <div class="footer-note"><strong>{{ __('Sales Representative:') }}</strong> {{ $salesRepresentative ?: __('Sales Team') }}</div>
+                    <div class="footer-note"><strong>{{ __('Generated:') }}</strong> {{ $generatedAt->format('Y-m-d H:i') }}</div>
                 </td>
                 <td style="width:36%; text-align:right;">
                     @if ($verificationQr)
                         <div class="verification-qr"><img src="{{ $verificationQr }}" alt="Verification QR"></div>
                     @endif
-                    <div class="verification-caption">Scan to verify</div>
+                    <div class="verification-caption">{{ __('Scan to verify') }}</div>
                 </td>
             </tr>
         </table>

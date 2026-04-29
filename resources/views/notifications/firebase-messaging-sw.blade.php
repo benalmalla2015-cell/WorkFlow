@@ -4,12 +4,13 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-com
 firebase.initializeApp(@json($firebaseConfig));
 
 const messaging = firebase.messaging();
+const defaultNotificationTitle = @json(__('تنبيه جديد'));
 
 messaging.onBackgroundMessage(function (payload) {
     const data = payload?.data || {};
     const notification = payload?.notification || {};
 
-    self.registration.showNotification(notification.title || data.title || 'تنبيه جديد', {
+    self.registration.showNotification(notification.title || data.title || defaultNotificationTitle, {
         body: notification.body || data.message || '',
         tag: data.tag || ('workflow-' + (data.order_id || 'notification')),
         data: {

@@ -1,64 +1,64 @@
 @extends('layouts.app')
 
-@section('title', 'السجلات التدقيقية | WorkFlow')
+@section('title', __('السجلات التدقيقية') . ' | WorkFlow')
 
 @section('content')
     @php
         $changeFieldLabels = [
-            'customer.full_name' => 'اسم العميل',
-            'customer.address' => 'العنوان',
-            'customer.phone' => 'رقم التواصل',
-            'customer.email' => 'البريد الإلكتروني',
-            'order.customer_name' => 'العميل على الطلب',
-            'order.product_name' => 'المنتج',
-            'order.quantity' => 'الكمية',
-            'order.specifications' => 'المواصفات',
-            'order.customer_notes' => 'ملاحظات العميل',
-            'order.supplier_name' => 'اسم المورد',
-            'order.product_code' => 'كود المنتج',
-            'order.factory_cost' => 'تكلفة المصنع',
-            'order.production_days' => 'مدة الإنتاج',
-            'order.selling_price' => 'سعر البيع',
-            'order.profit_margin_percentage' => 'هامش الربح',
-            'order.final_price' => 'السعر النهائي',
-            'order.total_price' => 'إجمالي السعر',
-            'order.net_profit' => 'صافي الربح',
-            'order.factory_user_id' => 'مسؤول المصنع',
-            'order.status' => 'الحالة',
+            'customer.full_name' => __('اسم العميل'),
+            'customer.address' => __('العنوان'),
+            'customer.phone' => __('رقم التواصل'),
+            'customer.email' => __('البريد الإلكتروني'),
+            'order.customer_name' => __('العميل على الطلب'),
+            'order.product_name' => __('المنتج'),
+            'order.quantity' => __('الكمية'),
+            'order.specifications' => __('المواصفات'),
+            'order.customer_notes' => __('ملاحظات العميل'),
+            'order.supplier_name' => __('اسم المورد'),
+            'order.product_code' => __('كود المنتج'),
+            'order.factory_cost' => __('تكلفة المصنع'),
+            'order.production_days' => __('مدة الإنتاج'),
+            'order.selling_price' => __('سعر البيع'),
+            'order.profit_margin_percentage' => __('هامش الربح'),
+            'order.final_price' => __('السعر النهائي'),
+            'order.total_price' => __('إجمالي السعر'),
+            'order.net_profit' => __('صافي الربح'),
+            'order.factory_user_id' => __('مسؤول المصنع'),
+            'order.status' => __('الحالة'),
         ];
     @endphp
 
     <div class="mb-4">
-        <h1 class="h3 mb-1">السجلات التدقيقية</h1>
-        <div class="text-muted">تتبع العمليات الحساسة في النظام لحظيًا.</div>
+        <h1 class="h3 mb-1">{{ __('السجلات التدقيقية') }}</h1>
+        <div class="text-muted">{{ __('تتبع العمليات الحساسة في النظام لحظيًا.') }}</div>
     </div>
 
     <div class="card page-card mb-4">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-3">
-                    <label class="form-label">الإجراء</label>
-                    <input type="text" name="action" value="{{ $filters['action'] ?? '' }}" class="form-control" placeholder="login, order_created ...">
+                    <label class="form-label">{{ __('الإجراء') }}</label>
+                    <input type="text" name="action" value="{{ $filters['action'] ?? '' }}" class="form-control" placeholder="{{ __('login, order_created ...') }}">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">المستخدم</label>
+                    <label class="form-label">{{ __('المستخدم') }}</label>
                     <select name="user_id" class="form-select">
-                        <option value="">الكل</option>
+                        <option value="">{{ __('الكل') }}</option>
                         @foreach ($users as $user)
                             <option value="{{ $user->id }}" @selected(($filters['user_id'] ?? '') == $user->id)>{{ $user->name }}</option>
                         @endforeach
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label">من تاريخ</label>
+                    <label class="form-label">{{ __('من تاريخ') }}</label>
                     <input type="date" name="date_from" value="{{ $filters['date_from'] ?? '' }}" class="form-control">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label">إلى تاريخ</label>
+                    <label class="form-label">{{ __('إلى تاريخ') }}</label>
                     <input type="date" name="date_to" value="{{ $filters['date_to'] ?? '' }}" class="form-control">
                 </div>
                 <div class="col-md-2 d-flex gap-2">
-                    <button type="submit" class="btn btn-dark flex-fill">تصفية</button>
+                    <button type="submit" class="btn btn-dark flex-fill">{{ __('تصفية') }}</button>
                 </div>
             </form>
         </div>
@@ -70,14 +70,14 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead>
                         <tr>
-                            <th>الوقت</th>
-                            <th>المستخدم</th>
-                            <th>الإجراء</th>
-                            <th>النموذج</th>
-                            <th>المعرف</th>
-                            <th>الملخص العربي</th>
-                            <th>IP</th>
-                            <th>تفاصيل</th>
+                            <th>{{ __('الوقت') }}</th>
+                            <th>{{ __('المستخدم') }}</th>
+                            <th>{{ __('الإجراء') }}</th>
+                            <th>{{ __('النموذج') }}</th>
+                            <th>{{ __('المعرف') }}</th>
+                            <th>{{ __('الملخص العربي') }}</th>
+                            <th>{{ __('IP') }}</th>
+                            <th>{{ __('تفاصيل') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -90,11 +90,11 @@
                                         }
 
                                         if (preg_match('/^items\.\d+\./', $field)) {
-                                            return 'عناصر الطلب';
+                                            return __('عناصر الطلب');
                                         }
 
                                         if (preg_match('/^attachments\.\d+\.(original_name|file_name)$/', $field)) {
-                                            return 'المرفقات';
+                                            return __('المرفقات');
                                         }
 
                                         if (preg_match('/^attachments\.\d+\./', $field)) {
@@ -123,9 +123,9 @@
                                 <td>{{ $log->ip_address ?: '—' }}</td>
                                 <td>
                                     <details>
-                                        <summary class="small text-primary" style="cursor: pointer;">عرض السجل</summary>
+                                        <summary class="small text-primary" style="cursor: pointer;">{{ __('عرض السجل') }}</summary>
                                         <div class="mt-2 small">
-                                            <div class="fw-semibold mb-1">الوصف البشري</div>
+                                            <div class="fw-semibold mb-1">{{ __('الوصف البشري') }}</div>
                                             @php
                                                 $humanLines = $log->humanChangeLines();
                                             @endphp
@@ -138,15 +138,15 @@
                                             @else
                                                 <div class="text-muted mb-2">{{ $log->humanSummary() }}</div>
                                             @endif
-                                            <div class="fw-semibold mb-1">القيم السابقة</div>
+                                            <div class="fw-semibold mb-1">{{ __('القيم السابقة') }}</div>
                                             @if ($log->old_values)
-                                                <div class="text-muted mb-2">يوجد تفاصيل محفوظة في السجل</div>
+                                                <div class="text-muted mb-2">{{ __('يوجد تفاصيل محفوظة في السجل') }}</div>
                                             @else
                                                 <div class="text-muted mb-2">—</div>
                                             @endif
-                                            <div class="fw-semibold mb-1">القيم الجديدة</div>
+                                            <div class="fw-semibold mb-1">{{ __('القيم الجديدة') }}</div>
                                             @if ($log->new_values)
-                                                <div class="text-muted">يوجد تفاصيل محفوظة في السجل</div>
+                                                <div class="text-muted">{{ __('يوجد تفاصيل محفوظة في السجل') }}</div>
                                             @else
                                                 <div class="text-muted">—</div>
                                             @endif
@@ -156,7 +156,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">لا توجد سجلات.</td>
+                                <td colspan="8" class="text-center py-5 text-muted">{{ __('لا توجد سجلات.') }}</td>
                             </tr>
                         @endforelse
                     </tbody>

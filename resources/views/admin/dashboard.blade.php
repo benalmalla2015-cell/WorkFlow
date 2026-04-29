@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'لوحة الاعتماد | WorkFlow')
+@section('title', __('لوحة الاعتماد') . ' | WorkFlow')
 
 @push('styles')
     <style>
@@ -114,20 +114,20 @@
     @php
         $groupMeta = [
             'new_pending' => [
-                'title' => 'طلبات جديدة / معلقة',
-                'description' => 'طلبات تحتاج اعتمادًا أو مراجعة تعديل أو لم تُحسم بعد.',
+                'title' => __('طلبات جديدة / معلقة'),
+                'description' => __('طلبات تحتاج اعتمادًا أو مراجعة تعديل أو لم تُحسم بعد.'),
                 'header_class' => 'brand-gold',
                 'badge_class' => 'gold',
             ],
             'in_progress' => [
-                'title' => 'طلبات جاري العمل عليها',
-                'description' => 'طلبات في مسار التشغيل والتسعير داخل المصنع.',
+                'title' => __('طلبات جاري العمل عليها'),
+                'description' => __('طلبات في مسار التشغيل والتسعير داخل المصنع.'),
                 'header_class' => 'brand-blue',
                 'badge_class' => '',
             ],
             'approved' => [
-                'title' => 'طلبات تم اعتمادها نهائيًا',
-                'description' => 'طلبات جاهزة تجاريًا أو وصلت للمراحل النهائية.',
+                'title' => __('طلبات تم اعتمادها نهائيًا'),
+                'description' => __('طلبات جاهزة تجاريًا أو وصلت للمراحل النهائية.'),
                 'header_class' => 'brand-blue',
                 'badge_class' => '',
             ],
@@ -137,19 +137,19 @@
     <div class="dashboard-hero mb-4">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div>
-                <h1 class="h3 mb-2 text-white">لوحة الاعتماد والإشراف</h1>
-                <div class="subline">عرض مرتب للطلبات حسب المرحلة: جديدة/معلقة، جاري العمل عليها، ومعتمدة نهائيًا، مع منع أي بيانات خام أو رموز مشوهة داخل الجداول.</div>
+                <h1 class="h3 mb-2 text-white">{{ __('لوحة الاعتماد والإشراف') }}</h1>
+                <div class="subline">{{ __('عرض مرتب للطلبات حسب المرحلة: جديدة/معلقة، جاري العمل عليها، ومعتمدة نهائيًا، مع منع أي بيانات خام أو رموز مشوهة داخل الجداول.') }}</div>
             </div>
             <form method="GET" class="d-flex gap-2 flex-wrap">
                 <select name="group" class="form-select brand-filter">
-                    <option value="">كل المجموعات</option>
-                    <option value="new_pending" @selected(($filters['group'] ?? '') === 'new_pending')>طلبات جديدة / معلقة</option>
-                    <option value="in_progress" @selected(($filters['group'] ?? '') === 'in_progress')>طلبات جاري العمل عليها</option>
-                    <option value="approved" @selected(($filters['group'] ?? '') === 'approved')>طلبات معتمدة نهائيًا</option>
+                    <option value="">{{ __('كل المجموعات') }}</option>
+                    <option value="new_pending" @selected(($filters['group'] ?? '') === 'new_pending')>{{ __('طلبات جديدة / معلقة') }}</option>
+                    <option value="in_progress" @selected(($filters['group'] ?? '') === 'in_progress')>{{ __('طلبات جاري العمل عليها') }}</option>
+                    <option value="approved" @selected(($filters['group'] ?? '') === 'approved')>{{ __('طلبات معتمدة نهائيًا') }}</option>
                 </select>
-                <button type="submit" class="btn btn-light">تصفية</button>
+                <button type="submit" class="btn btn-light">{{ __('تصفية') }}</button>
                 @if (($filters['group'] ?? '') !== '')
-                    <a href="{{ route('admin.dashboard') }}" class="btn btn-outline-light">إلغاء</a>
+                    <a href="{{ route('admin.dashboard') }}" class="btn btn-outline-light">{{ __('إلغاء') }}</a>
                 @endif
             </form>
         </div>
@@ -159,7 +159,7 @@
         <div class="col-md-3">
             <div class="card brand-stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted mb-2">إجمالي الطلبات</div>
+                    <div class="text-muted mb-2">{{ __('إجمالي الطلبات') }}</div>
                     <div class="brand-stat-value brand-stat-blue">{{ $stats['total_orders'] }}</div>
                 </div>
             </div>
@@ -167,7 +167,7 @@
         <div class="col-md-3">
             <div class="card brand-stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted mb-2">طلبات جديدة / معلقة</div>
+                    <div class="text-muted mb-2">{{ __('طلبات جديدة / معلقة') }}</div>
                     <div class="brand-stat-value brand-stat-gold">{{ $stats['new_pending'] }}</div>
                 </div>
             </div>
@@ -175,7 +175,7 @@
         <div class="col-md-3">
             <div class="card brand-stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted mb-2">جاري العمل عليها</div>
+                    <div class="text-muted mb-2">{{ __('جاري العمل عليها') }}</div>
                     <div class="brand-stat-value brand-stat-blue">{{ $stats['in_progress'] }}</div>
                 </div>
             </div>
@@ -183,7 +183,7 @@
         <div class="col-md-3">
             <div class="card brand-stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted mb-2">تعديلات بانتظار الاعتماد</div>
+                    <div class="text-muted mb-2">{{ __('تعديلات بانتظار الاعتماد') }}</div>
                     <div class="brand-stat-value brand-stat-gold">{{ $stats['pending_adjustments'] }}</div>
                 </div>
             </div>
@@ -207,13 +207,13 @@
                     <table class="table table-brand align-middle mb-0">
                         <thead>
                             <tr>
-                                <th>رقم الطلب</th>
-                                <th>العميل</th>
-                                <th>المنتج</th>
-                                <th>الحالة</th>
-                                <th>المسؤول الحالي</th>
-                                <th>آخر تحديث</th>
-                                <th>الإجراء</th>
+                                <th>{{ __('رقم الطلب') }}</th>
+                                <th>{{ __('العميل') }}</th>
+                                <th>{{ __('المنتج') }}</th>
+                                <th>{{ __('الحالة') }}</th>
+                                <th>{{ __('المسؤول الحالي') }}</th>
+                                <th>{{ __('آخر تحديث') }}</th>
+                                <th>{{ __('الإجراء') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -239,17 +239,17 @@
                                     <td>{{ optional($order->updated_at)->format('Y-m-d H:i') ?: '—' }}</td>
                                     <td>
                                         @if ($hasPendingChange)
-                                            <a href="{{ route('admin.orders.pending-changes.review', $order) }}" class="btn btn-sm btn-primary">مراجعة التعديل</a>
+                                            <a href="{{ route('admin.orders.pending-changes.review', $order) }}" class="btn btn-sm btn-primary">{{ __('مراجعة التعديل') }}</a>
                                         @elseif ($order->status === 'manager_review')
-                                            <a href="{{ route('admin.orders.review', $order) }}" class="btn btn-sm btn-outline-primary">مراجعة الطلب</a>
+                                            <a href="{{ route('admin.orders.review', $order) }}" class="btn btn-sm btn-outline-primary">{{ __('مراجعة الطلب') }}</a>
                                         @else
-                                            <span class="text-muted">لا إجراء مطلوب</span>
+                                            <span class="text-muted">{{ __('لا إجراء مطلوب') }}</span>
                                         @endif
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-5">لا توجد طلبات ضمن هذه المجموعة حاليًا.</td>
+                                    <td colspan="7" class="text-center text-muted py-5">{{ __('لا توجد طلبات ضمن هذه المجموعة حاليًا.') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -261,24 +261,24 @@
 
     <div class="card page-card">
         <div class="card-body">
-            <h2 class="h5 section-title mb-3">إرشادات قرار الإدارة</h2>
+            <h2 class="h5 section-title mb-3">{{ __('إرشادات قرار الإدارة') }}</h2>
             <div class="row g-3">
                 <div class="col-lg-4">
                     <div class="border rounded-4 p-3 h-100 bg-light">
-                        <div class="fw-semibold mb-2">مراجعة التعديل</div>
-                        <div class="text-muted small">تُعرض المقارنة بصيغة بشرية واضحة، مع إبراز السعر النهائي فقط عند توفره، دون أي JSON خام أو تكلفة مصنع داخل الصفحة.</div>
+                        <div class="fw-semibold mb-2">{{ __('مراجعة التعديل') }}</div>
+                        <div class="text-muted small">{{ __('تُعرض المقارنة بصيغة بشرية واضحة، مع إبراز السعر النهائي فقط عند توفره، دون أي JSON خام أو تكلفة مصنع داخل الصفحة.') }}</div>
                     </div>
                 </div>
                 <div class="col-lg-4">
                     <div class="border rounded-4 p-3 h-100 bg-light">
-                        <div class="fw-semibold mb-2">جاري العمل عليها</div>
-                        <div class="text-muted small">طلبات ما زالت في المصنع أو في مرحلة التسعير والتجهيز التشغيلي قبل الإغلاق التجاري.</div>
+                        <div class="fw-semibold mb-2">{{ __('جاري العمل عليها') }}</div>
+                        <div class="text-muted small">{{ __('طلبات ما زالت في المصنع أو في مرحلة التسعير والتجهيز التشغيلي قبل الإغلاق التجاري.') }}</div>
                     </div>
                 </div>
                 <div class="col-lg-4">
                     <div class="border rounded-4 p-3 h-100 bg-light">
-                        <div class="fw-semibold mb-2">اعتماد نهائي</div>
-                        <div class="text-muted small">طلبات أصبحت جاهزة تجاريًا أو تم تأكيدها في المراحل النهائية بعد اكتمال المسار الإداري.</div>
+                        <div class="fw-semibold mb-2">{{ __('اعتماد نهائي') }}</div>
+                        <div class="text-muted small">{{ __('طلبات أصبحت جاهزة تجاريًا أو تم تأكيدها في المراحل النهائية بعد اكتمال المسار الإداري.') }}</div>
                     </div>
                 </div>
             </div>

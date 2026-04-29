@@ -10,8 +10,12 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
     'asset_url' => env('ASSET_URL'),
     'timezone' => 'Asia/Riyadh',
-    'locale' => 'en',
+    'locale' => env('APP_LOCALE', 'en'),
     'fallback_locale' => 'en',
+    'available_locales' => [
+        'ar' => 'العربية',
+        'en' => 'English',
+    ],
     'faker_locale' => 'en_US',
     'key' => env('APP_KEY'),
     'cipher' => 'AES-256-CBC',

@@ -1,8 +1,8 @@
 ﻿<!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
-    <title>فاتورة {{ $order->order_number }}</title>
+    <title>{{ __('فاتورة') }} {{ $order->order_number }}</title>
     <style>
         body {
             font-family: DejaVu Sans, sans-serif;
@@ -10,11 +10,11 @@
             font-size: 11px;
             margin: 0;
             padding: 18px 22px;
-            direction: rtl;
+            direction: {{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }};
         }
         .header { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
         .brand-block { width: 64%; vertical-align: top; }
-        .doc-block { width: 36%; vertical-align: top; text-align: left; }
+        .doc-block { width: 36%; vertical-align: top; text-align: start; }
         .brand { font-size: 28px; font-weight: 900; color: #0f172a; letter-spacing: 1px; }
         .brand-sub { font-size: 10px; color: #475569; margin-top: 3px; }
         .brand-ar { font-size: 12px; font-weight: 700; margin-top: 5px; }
@@ -30,11 +30,11 @@
         .items-table th { background: #0f172a; color: #fff; padding: 9px 7px; font-size: 10px; text-align: center; }
         .items-table td { border: 1px solid #dbe2ea; padding: 8px 7px; font-size: 10px; text-align: center; vertical-align: top; }
         .items-table tbody tr:nth-child(even) { background: #f8fafc; }
-        .summary-wrap { width: 42%; margin-right: auto; margin-bottom: 16px; }
+        .summary-wrap { width: 42%; margin-inline-start: auto; margin-bottom: 16px; }
         .summary-table td { border: 1px solid #dbe2ea; padding: 7px 10px; font-size: 10px; }
         .summary-table .grand td { background: #0f172a; color: #fff; font-weight: 800; }
         .bank-details th, .bank-details td { border: 1px solid #cbd5e1; padding: 7px 9px; font-size: 10px; }
-        .bank-details th { width: 34%; background: #f8fafc; color: #334155; text-align: right; }
+        .bank-details th { width: 34%; background: #f8fafc; color: #334155; text-align: start; }
         .remark { color: #b91c1c; font-size: 10px; font-weight: 700; margin-top: 15px; border: 1px dashed #ef4444; padding: 10px 12px; border-radius: 12px; }
         .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #64748b; border-top: 1px solid #cbd5e1; padding-top: 10px; }
     </style>
@@ -44,19 +44,19 @@
         <tr>
             <td class="brand-block">
                 <div class="brand">DAYANCO®</div>
-                <div class="brand-sub">Supply Chain Management</div>
+                <div class="brand-sub">{{ __('Supply Chain Management') }}</div>
                 <div class="company-meta">
                     {{ $company['address'] ?: 'ROOM 807-1, NO 1, 2ND QILIN STREET, HUANGGE TOWN, NANSHA DISTRICT, GUANGZHOU, 511455, P.R. CHINA' }}<br>
-                    ATTN: {{ $company['attn'] ?: 'Mr. Abdulmalek' }} | {{ $company['phone'] ?: '+86 188188 45411' }} | {{ $company['email'] ?: 'team@dayancoofficial.com' }}
+                    {{ __('ATTN') }}: {{ $company['attn'] ?: 'Mr. Abdulmalek' }} | {{ $company['phone'] ?: '+86 188188 45411' }} | {{ $company['email'] ?: 'team@dayancoofficial.com' }}
                 </div>
             </td>
             <td class="doc-block">
                 <div class="doc-card">
-                    <div class="doc-name">INVOICE</div>
+                    <div class="doc-name">{{ __('INVOICE') }}</div>
                     <div class="doc-meta">
-                        <strong>رقم الفاتورة:</strong> {{ $documentOrder['order_number'] }}<br>
-                        <strong>التاريخ:</strong> {{ $generatedAt->format('Y-m-d') }}<br>
-                        <strong>العملة:</strong> {{ $totals['currency'] }}
+                        <strong>{{ __('رقم الفاتورة') }}:</strong> {{ $documentOrder['order_number'] }}<br>
+                        <strong>{{ __('التاريخ') }}:</strong> {{ $generatedAt->format('Y-m-d') }}<br>
+                        <strong>{{ __('العملة') }}:</strong> {{ $totals['currency'] }}
                     </div>
                 </div>
             </td>
@@ -64,19 +64,19 @@
     </table>
 
     <div class="section">
-        <div class="section-title">بيانات العميل</div>
+        <div class="section-title">{{ __('بيانات العميل') }}</div>
         <table class="meta-table">
             <tr>
-                <td class="label">العميل</td>
+                <td class="label">{{ __('العميل') }}</td>
                 <td>{{ $documentOrder['customer_name'] }}</td>
             </tr>
             <tr>
-                <td class="label">مرجع الطلب</td>
+                <td class="label">{{ __('مرجع الطلب') }}</td>
                 <td>{{ $documentOrder['order_number'] }}</td>
             </tr>
             <tr>
-                <td class="label">مدة الإنتاج</td>
-                <td>{{ $documentOrder['production_days'] }} يوم</td>
+                <td class="label">{{ __('مدة الإنتاج') }}</td>
+                <td>{{ $documentOrder['production_days'] }} {{ __('يوم') }}</td>
             </tr>
         </table>
     </div>
@@ -85,11 +85,11 @@
         <thead>
             <tr>
                 <th style="width: 6%;">#</th>
-                <th style="width: 26%;">الصنف / Item</th>
-                <th>الوصف / Description</th>
-                <th style="width: 12%;">الكمية</th>
-                <th style="width: 16%;">سعر البيع</th>
-                <th style="width: 18%;">الإجمالي</th>
+                <th style="width: 26%;">{{ __('الصنف / Item') }}</th>
+                <th>{{ __('الوصف / Description') }}</th>
+                <th style="width: 12%;">{{ __('الكمية') }}</th>
+                <th style="width: 16%;">{{ __('سعر البيع') }}</th>
+                <th style="width: 18%;">{{ __('الإجمالي') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -109,58 +109,58 @@
     <div class="summary-wrap">
         <table class="summary-table">
             <tr>
-                <td>الإجمالي قبل الضريبة</td>
+                <td>{{ __('الإجمالي قبل الضريبة') }}</td>
                 <td style="text-align: left;">{{ $totals['currency'] }} {{ number_format((float) $totals['subtotal'], 2) }}</td>
             </tr>
             <tr>
-                <td>الضريبة</td>
+                <td>{{ __('الضريبة') }}</td>
                 <td style="text-align: left;">{{ number_format((float) $totals['tax_rate'], 2) }}% ({{ $totals['currency'] }} {{ number_format((float) $totals['tax_amount'], 2) }})</td>
             </tr>
             <tr class="grand">
-                <td>الإجمالي النهائي</td>
+                <td>{{ __('الإجمالي النهائي') }}</td>
                 <td style="text-align: left;">{{ $totals['currency'] }} {{ number_format((float) $totals['grand_total'], 2) }}</td>
             </tr>
         </table>
     </div>
 
-    <div style="font-weight: 700; font-size: 11px; margin-bottom: 6px;">طريقة الدفع / Payment Method</div>
+    <div style="font-weight: 700; font-size: 11px; margin-bottom: 6px;">{{ __('طريقة الدفع / Payment Method') }}</div>
     
     <table class="bank-details">
         <tr>
-            <th>اسم المستفيد / Beneficiary Name</th>
+            <th>{{ __('اسم المستفيد / Beneficiary Name') }}</th>
             <td>{{ $company['beneficiary_name'] ?: 'DAYANCO' }}</td>
         </tr>
         <tr>
-            <th>البنك / Beneficiary Bank</th>
+            <th>{{ __('البنك / Beneficiary Bank') }}</th>
             <td>{{ $company['beneficiary_bank'] ?: 'ZHEJIANG CHOUZHOU COMMERCIAL BANK' }}</td>
         </tr>
         <tr>
-            <th>رقم الحساب / Account No.</th>
+            <th>{{ __('رقم الحساب / Account No.') }}</th>
             <td>{{ $company['account_number'] ?: 'NRA15617142010500006871' }}</td>
         </tr>
         <tr>
-            <th>عنوان المستفيد / Beneficiary Address</th>
+            <th>{{ __('عنوان المستفيد / Beneficiary Address') }}</th>
             <td>{{ $company['beneficiary_address'] ?: 'RM906, 9TH FLOOR, RUISHENGGUOJI, NO. 787 ZENGCHA LU, BAIYUN DISTRICT, GUANGZHOU 510000 P.R. CHINA' }}</td>
         </tr>
         <tr>
-            <th>عنوان البنك / Bank Address</th>
+            <th>{{ __('عنوان البنك / Bank Address') }}</th>
             <td>{{ $company['bank_address'] ?: 'YIWULEYUAN EAST, JIANGBIN RD, YIWU, ZHEJIANG, CHINA' }}</td>
         </tr>
         <tr>
-            <th>SWIFT</th>
+            <th>{{ __('SWIFT') }}</th>
             <td>{{ $company['swift_code'] ?: 'CZCBCN2X' }}</td>
         </tr>
         <tr>
-            <th>الدولة / Country</th>
-            <td>China</td>
+            <th>{{ __('الدولة / Country') }}</th>
+            <td>{{ __('China') }}</td>
         </tr>
         <tr>
-            <th>الغرض / Purpose</th>
-            <td>PURCHASE OF GOODS</td>
+            <th>{{ __('الغرض / Purpose') }}</th>
+            <td>{{ __('PURCHASE OF GOODS') }}</td>
         </tr>
     </table>
 
-    <div class="remark">يرجى استخدام الاسم الكامل للمستفيد أعلاه عند التحويل. شكراً لكم.<br>REMARK: PLEASE USE THE FULL BENEFICIARY NAME ABOVE WHEN REMITTING. THANK YOU!</div>
+    <div class="remark">{{ __('يرجى استخدام الاسم الكامل للمستفيد أعلاه عند التحويل. شكراً لكم.') }}<br>{{ __('REMARK: PLEASE USE THE FULL BENEFICIARY NAME ABOVE WHEN REMITTING. THANK YOU!') }}</div>
 
     <div class="footer">
         DAYANCO<br>

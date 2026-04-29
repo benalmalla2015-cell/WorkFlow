@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -55,7 +55,7 @@
         }
         .features {
             margin-top: 2rem;
-            text-align: left;
+            text-align: start;
         }
         .feature {
             padding: 0.5rem 0;
@@ -65,7 +65,7 @@
             content: "✓";
             color: #667eea;
             font-weight: bold;
-            margin-right: 0.5rem;
+            margin-inline-end: 0.5rem;
         }
     </style>
 </head>
@@ -73,22 +73,22 @@
     <div class="container">
         <div class="logo">🏢</div>
         <h1 class="title">DAYANCO</h1>
-        <p class="subtitle">منصة مؤسسية متكاملة لإدارة سير العمل والاعتمادات والوثائق</p>
+        <p class="subtitle">{{ __('منصة مؤسسية متكاملة لإدارة سير العمل والاعتمادات والوثائق') }}</p>
         
-        <a href="/login" class="login-btn">🚀 تسجيل الدخول إلى النظام</a>
+        <a href="/login" class="login-btn">🚀 {{ __('تسجيل الدخول إلى النظام') }}</a>
         
         <div class="features">
-            <div class="feature">إدارة المستخدمين حسب الأدوار والصلاحيات</div>
-            <div class="feature">معالجة الطلبات وتتبع مراحل الاعتماد</div>
-            <div class="feature">توليد المستندات الاحترافية بصيغة PDF</div>
-            <div class="feature">إشعارات لحظية ولوحة متابعة مركزية</div>
-            <div class="feature">حفظ آمن للمرفقات والوثائق</div>
+            <div class="feature">{{ __('إدارة المستخدمين حسب الأدوار والصلاحيات') }}</div>
+            <div class="feature">{{ __('معالجة الطلبات وتتبع مراحل الاعتماد') }}</div>
+            <div class="feature">{{ __('توليد المستندات الاحترافية بصيغة PDF') }}</div>
+            <div class="feature">{{ __('إشعارات لحظية ولوحة متابعة مركزية') }}</div>
+            <div class="feature">{{ __('حفظ آمن للمرفقات والوثائق') }}</div>
         </div>
         
         <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #eee;">
             <small style="color: #999;">
                 DAYANCO<br>
-                © 2024 نظام إدارة سير العمل المؤسسي
+                © 2024 {{ __('نظام إدارة سير العمل المؤسسي') }}
             </small>
         </div>
     </div>

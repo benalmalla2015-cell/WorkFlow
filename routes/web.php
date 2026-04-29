@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\Web\AdminPortalController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\DashboardController;
@@ -25,6 +26,8 @@ Route::get('/', function () {
 Route::get('/firebase-messaging-sw.js', [NotificationController::class, 'serviceWorker']);
 
 Route::get('/verify/{orderNumber}', [DashboardController::class, 'verifyOrder'])->name('orders.verify');
+
+Route::post('/locale', [LocaleController::class, 'switch'])->name('locale.switch');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'create'])->name('login');

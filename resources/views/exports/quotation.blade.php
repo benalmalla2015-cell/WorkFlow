@@ -2,40 +2,40 @@
     <!-- Header -->
     <tr>
         <td colspan="16" style="text-align: center; font-size: 18px; font-weight: bold; background-color: #E3F2FD;">
-            {{ $company['name'] }} - QUOTATION
+            {{ $company['name'] }} - {{ __('QUOTATION') }}
         </td>
     </tr>
     <tr>
         <td colspan="8">
-            <strong>Quotation Number:</strong> {{ $quotation_number }}<br>
-            <strong>Date:</strong> {{ $quotation_date }}<br>
-            <strong>Page:</strong> 1
+            <strong>{{ __('Quotation Number:') }}</strong> {{ $quotation_number }}<br>
+            <strong>{{ __('Date:') }}</strong> {{ $quotation_date }}<br>
+            <strong>{{ __('Page:') }}</strong> 1
         </td>
         <td colspan="8">
-            <strong>Customer:</strong> {{ $customer->full_name }}<br>
-            <strong>Address:</strong> {{ $customer->address }}<br>
-            <strong>Phone:</strong> {{ $customer->phone }}
+            <strong>{{ __('Customer:') }}</strong> {{ $customer->full_name }}<br>
+            <strong>{{ __('Address:') }}</strong> {{ $customer->address }}<br>
+            <strong>{{ __('Phone:') }}</strong> {{ $customer->phone }}
         </td>
     </tr>
     
     <!-- Table Headers -->
     <tr style="background-color: #F5F5F5; font-weight: bold;">
-        <td>No.</td>
-        <td>Item Name</td>
-        <td>Reference Picture</td>
-        <td>HS CODE</td>
-        <td>Barcode</td>
-        <td>Material</td>
-        <td>Color</td>
-        <td>Size</td>
-        <td>Packaging (Quantities/Carton)</td>
-        <td>Carton Size</td>
-        <td>Loading Container</td>
-        <td>PALLETS</td>
-        <td>PCS</td>
-        <td>Final Price (USD)</td>
-        <td>Sub-total (USD)</td>
-        <td>Production Lead Time (DAYS)</td>
+        <td>{{ __('No.') }}</td>
+        <td>{{ __('Item Name') }}</td>
+        <td>{{ __('Reference Picture') }}</td>
+        <td>{{ __('HS CODE') }}</td>
+        <td>{{ __('Barcode') }}</td>
+        <td>{{ __('Material') }}</td>
+        <td>{{ __('Color') }}</td>
+        <td>{{ __('Size') }}</td>
+        <td>{{ __('Packaging (Quantities/Carton)') }}</td>
+        <td>{{ __('Carton Size') }}</td>
+        <td>{{ __('Loading Container') }}</td>
+        <td>{{ __('PALLETS') }}</td>
+        <td>{{ __('PCS') }}</td>
+        <td>{{ __('Final Price (USD)') }}</td>
+        <td>{{ __('Sub-total (USD)') }}</td>
+        <td>{{ __('Production Lead Time (DAYS)') }}</td>
     </tr>
     
     <!-- Items -->
@@ -62,7 +62,7 @@
     
     <!-- Total -->
     <tr style="background-color: #E8F5E8; font-weight: bold;">
-        <td colspan="14">TOTAL</td>
+        <td colspan="14">{{ __('TOTAL') }}</td>
         <td>${{ number_format($total_amount, 2) }}</td>
         <td>{{ $items[0]['production_lead_time'] ?? 30 }}</td>
     </tr>
@@ -70,7 +70,7 @@
     <!-- Footer -->
     <tr>
         <td colspan="16" style="text-align: center; font-style: italic; border-top: 2px solid #333;">
-            Sales Representative: {{ $sales_user->name }} | Generated on: {{ now()->format('Y-m-d H:i:s') }}
+            {{ __('Sales Representative:') }} {{ $sales_user->name }} | {{ __('Generated on:') }} {{ now()->format('Y-m-d H:i:s') }}
         </td>
     </tr>
 </table>

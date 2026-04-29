@@ -19,6 +19,7 @@ class User extends Authenticatable
         'password',
         'phone',
         'role',
+        'locale',
         'is_active',
     ];
 

@@ -241,15 +241,15 @@ class Order extends Model
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {
-            'draft' => 'جديد',
-            'sent_to_factory' => 'تم الإرسال إلى المصنع',
-            'factory_pricing' => 'عاد لتعديل تشغيلي',
-            'manager_review' => 'قيد مراجعة المدير',
-            'pending_approval' => 'طلب تعديل بانتظار الاعتماد',
-            'approved' => 'معتمد',
-            'customer_approved' => 'موافقة العميل مسجلة',
-            'payment_confirmed' => 'تم تأكيد الدفع',
-            'completed' => 'مكتمل',
+            'draft' => __('جديد'),
+            'sent_to_factory' => __('تم الإرسال إلى المصنع'),
+            'factory_pricing' => __('عاد لتعديل تشغيلي'),
+            'manager_review' => __('قيد مراجعة المدير'),
+            'pending_approval' => __('طلب تعديل بانتظار الاعتماد'),
+            'approved' => __('معتمد'),
+            'customer_approved' => __('موافقة العميل مسجلة'),
+            'payment_confirmed' => __('تم تأكيد الدفع'),
+            'completed' => __('مكتمل'),
             default => ucwords(str_replace('_', ' ', $this->status)),
         };
     }
