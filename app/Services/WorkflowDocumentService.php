@@ -83,6 +83,56 @@ class WorkflowDocumentService
         return route('orders.verify', ['orderNumber' => $order->order_number]);
     }
 
+    /**
+     * Build the same payload used by PDF rendering, so alternate exporters
+     * (Excel / Word) stay 100% in sync with the existing PDF data without
+     * altering the existing PDF generation flow.
+     */
+    public function buildDocumentPayload(Order $order, string $documentType): array
+    {
+        $order = $this->loadOrder($order);
+
+        if (!$order->canGenerateCommercialDocuments()) {
+            throw ValidationException::withMessages([
+                'order' => 'لا يمكن توليد المستندات التجارية قبل اعتماد المدير للطلب.',
+            ]);
+        }
+
+        $items = $this->resolveItems($order);
+
+        if ($items === []) {
+            throw ValidationException::withMessages([
+                'items' => 'يجب أن يحتوي الطلب على عنصر واحد على الأقل قبل توليد المستند.',
+            ]);
+        }
+
+        $verificationUrl = $this->verificationUrl($order);
+
+        return [
+            'order' => $order,
+            'documentType' => $documentType,
+            'documentOrder' => [
+                'order_number' => (string) $order->order_number,
+                'customer_name' => $this->resolveCustomerName($order),
+                'customer_address' => (string) ($order->customer?->address ?? ''),
+                'customer_phone' => (string) ($order->customer?->phone ?? ''),
+                'production_days' => (string) ($order->production_days ?: '—'),
+                'product_name' => (string) ($order->product_name ?: collect($items)->pluck('item_name')->implode(' / ') ?: 'Document'),
+                'file_number' => 'XXX-' . substr((string) $order->order_number, -9),
+                'issue_date' => now()->format('Y-m-d'),
+                'issue_date_long' => now()->format('F jS, Y'),
+                'valid_until' => now()->copy()->addDays(21)->format('F jS, Y'),
+            ],
+            'items' => $items,
+            'company' => $this->companyProfile(),
+            'generatedAt' => now(),
+            'verificationUrl' => $verificationUrl,
+            'verificationQr' => $this->generateVerificationQr($verificationUrl),
+            'salesRepresentative' => (string) ($order->salesUser?->name ?? ''),
+            'totals' => $this->resolveTotals($order, $items),
+        ];
+    }
+
     private function loadOrder(Order $order): Order
     {
         return Order::withoutGlobalScopes()
